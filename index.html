@@ -13,7 +13,8 @@
     <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
     <style>
         body {
-            background: linear-gradient(to bottom, #1E3A8A, #111827);
+            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;
+            background-size: cover;
             font-family: 'Lora', serif;
             color: #F3F4F6;
             min-height: 100vh;
@@ -120,6 +121,29 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
         }
+        .tooltip {
+            position: relative;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #1F2937;
+            color: #F3F4F6;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -131,14 +155,14 @@
             <button id="toggle-dark" class="bg-gray-700 text-white px-4 py-2 rounded-full hover:bg-gray-600 focus:outline-none">
                 <i class="fas fa-moon"></i> Dark Mode
             </button>
-            <button id="toggle-sound" class="bg-saffron-600 text-white px-4 py-2 rounded-full hover:bg-saffron-700">
+            <button id="toggle-sound" class="bg-orange-600 text-white px-4 py-2 rounded-full hover:bg-orange-700">
                 <i class="fas fa-volume-up"></i> Sound Off
             </button>
         </div>
     </header>
 
     <main class="flex-grow container mx-auto p-4 md:p-8">
-        <section id="auth-section" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <section id="auth-section" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 max-w-4xl mx-auto p-8">
             <div id="login-section" class="glassmorphism p-6 rounded-xl shadow-xl glow-on-hover">
                 <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300"><i class="fas fa-sign-in-alt"></i> Board Now</h2>
                 <div class="space-y-6">
@@ -176,18 +200,21 @@
                 <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300 slide-in"><i class="fas fa-tachometer-alt"></i> Train Health Index</h2>
                 <div class="mb-6 relative">
                     <label for="train-number" class="block text-sm font-medium mb-2 text-gray-300">Enter Train Number</label>
-                    <input type="text" id="train-number" class="w-full p-3 platform-board focus:ring-0" placeholder="e.g., 107" aria-label="Train number input" autocomplete="off">
+                    <input type="text" id="train-number" class="w-full p-3 platform-board focus:ring-0" placeholder="e.g., 10103" aria-label="Train number input" autocomplete="off">
                     <div id="suggestions" class="hidden"></div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <button id="get-thi" class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 glow-on-hover">
+                    <button id="get-thi" class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 glow-on-hover tooltip">
                         <i class="fas fa-search"></i> Get Health Index
+                        <span class="tooltiptext">Fetch real-time train health and insights</span>
                     </button>
-                    <button id="show-ai-features" class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 glow-on-hover">
+                    <button id="show-ai-features" class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 glow-on-hover tooltip">
                         <i class="fas fa-robot"></i> AI Features
+                        <span class="tooltiptext">Explore 100+ AI-driven insights</span>
                     </button>
-                    <button id="export-report" class="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 glow-on-hover">
+                    <button id="export-report" class="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 glow-on-hover tooltip">
                         <i class="fas fa-file-download"></i> Export Report
+                        <span class="tooltiptext">Download detailed train report</span>
                     </button>
                 </div>
                 <div id="train-not-found" class="hidden text-red-400 mt-4">Train not found. Please enter a valid train number.</div>
@@ -200,8 +227,6 @@
                                     <tr class="bg-blue-800 text-white">
                                         <th class="p-3">SEQ</th>
                                         <th class="p-3">Station (Code)</th>
-                                        <th class="p-3">Arrival</th>
-                                        <th class="p-3">Departure</th>
                                         <th class="p-3">Distance</th>
                                     </tr>
                                 </thead>
@@ -285,7 +310,7 @@
                 initializeAI();
             } catch (error) {
                 console.error('Error loading train data:', error);
-                alert('Failed to load train data. Please ensure train_data.json exists.');
+                alert('Failed to load train data. Please ensure train_max_distance_only.json exists.');
                 trainData = [];
             }
         }
@@ -368,22 +393,16 @@
             };
         }
 
-        // THI calculation
-        function calculateTHI(sensorData, scheduleData) {
+        // THI calculation (based on sensor data and distance)
+        function calculateTHI(sensorData, distance) {
             let score = 100;
-            // Sensor-based penalties
             if (sensorData["Brake Temperature (°C)"] > 90) score -= 15;
             if (sensorData["Axle Vibration (mm/s)"] > 2.5) score -= 20;
             if (sensorData["Wheel Wear (%)"] > 70) score -= 25;
             if (sensorData["Engine Load (%)"] > 85) score -= 10;
             if (sensorData["Battery Voltage (V)"] < 11) score -= 10;
             if (sensorData["Fuel Efficiency (km/L)"] < 3) score -= 10;
-            // Schedule-based penalties
-            const delays = scheduleData.reduce((sum, row) => {
-                const stopTime = (row['Dep Time'] - row['Arr Time']) * 24 * 60;
-                return sum + (stopTime > 10 ? stopTime - 10 : 0);
-            }, 0);
-            score -= Math.min(delays / 2, 20);
+            if (distance > 2000) score -= 10; // Penalty for long routes
             return Math.max(0, Math.round(score));
         }
 
@@ -393,276 +412,269 @@
             return "❌ Critical issues detected. Immediate inspection required!";
         }
 
-        function decimalToTime(decimal) {
-            if (decimal == null) return 'N/A';
-            const hours = Math.floor(decimal * 24);
-            const minutes = Math.round((decimal * 24 - hours) * 60);
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        }
-
-        // AI Features (100+ Real-Time)
+        // AI Features (120+ Real-Time)
         const aiFeatures = [
-            // Anomaly Detection (20)
-            { name: 'Negative Stop Time Detection', fn: data => data.some(row => (row['Dep Time'] - row['Arr Time']) < 0) ? "⚠️ Negative stop times detected." : "✅ No negative stop times.", description: 'Identifies invalid stop durations.' },
-            { name: 'Missing Time Detection', fn: data => data.some(row => row['Arr Time'] == null || row['Dep Time'] == null) ? "⚠️ Missing arrival/departure times." : "✅ All times present.", description: 'Checks for null time entries.' },
-            { name: 'Distance Anomaly', fn: data => data.some((row, i) => i > 0 && row.Distance < data[i-1].Distance) ? "⚠️ Decreasing distance detected." : "✅ Distance progression valid.", description: 'Ensures distance increases monotonically.' },
-            { name: 'Station Code Duplication', fn: data => new Set(data.map(row => row['Station Code'])).size !== data.length ? "⚠️ Duplicate station codes." : "✅ Unique station codes.", description: 'Detects repeated station codes.' },
-            { name: 'Sequence Gap Detection', fn: data => data.some((row, i) => i > 0 && row.SEQ !== data[i-1].SEQ + 1) ? "⚠️ Gaps in SEQ numbers." : "✅ Sequential SEQ numbers.", description: 'Checks for missing SEQ values.' },
-            { name: 'Source-Destination Mismatch', fn: data => data[0]['Source Station'] !== data[0]['Station Code'] || data[data.length-1]['Destination Station'] !== data[data.length-1]['Station Code'] ? "⚠️ Source/Destination mismatch." : "✅ Valid source/destination.", description: 'Verifies source and destination stations.' },
-            { name: 'Time Jump Detection', fn: data => data.some((row, i) => i > 0 && (row['Arr Time'] - data[i-1]['Dep Time']) * 24 * 60 > 120) ? "⚠️ Large time jumps between stations." : "✅ Normal time progression.", description: 'Identifies unrealistic travel times.' },
-            { name: 'Sensor Spike Detection', fn: sensor => sensor["Brake Temperature (°C)"] > 110 ? "⚠️ Brake temperature spike." : "✅ Normal brake temperature.", description: 'Detects extreme brake temperature readings.' },
-            { name: 'Vibration Outlier', fn: sensor => sensor["Axle Vibration (mm/s)"] > 3.5 ? "⚠️ High axle vibration." : "✅ Normal vibration levels.", description: 'Identifies excessive axle vibrations.' },
-            { name: 'Wheel Wear Threshold', fn: sensor => sensor["Wheel Wear (%)"] > 85 ? "⚠️ Critical wheel wear." : "✅ Wheel wear within limits.", description: 'Checks for severe wheel degradation.' },
-            { name: 'Engine Overload', fn: sensor => sensor["Engine Load (%)"] > 95 ? "⚠️ Engine overload detected." : "✅ Engine load normal.", description: 'Detects engine strain.' },
-            { name: 'Battery Voltage Drop', fn: sensor => sensor["Battery Voltage (V)"] < 10.8 ? "⚠️ Low battery voltage." : "✅ Battery voltage stable.", description: 'Identifies battery issues.' },
-            { name: 'Fuel Efficiency Dip', fn: sensor => sensor["Fuel Efficiency (km/L)"] < 2.5 ? "⚠️ Poor fuel efficiency." : "✅ Fuel efficiency normal.", description: 'Detects fuel consumption anomalies.' },
-            { name: 'Stop Time Outlier', fn: data => data.some(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 30) ? "⚠️ Excessive stop times." : "✅ Normal stop durations.", description: 'Identifies unusually long stops.' },
-            { name: 'Schedule Inconsistency', fn: data => data.some((row, i) => i > 0 && row['Arr Time'] < data[i-1]['Dep Time']) ? "⚠️ Schedule inconsistencies." : "✅ Consistent schedule.", description: 'Checks for time overlaps.' },
-            { name: 'Station Name Mismatch', fn: data => data.some(row => row['Station Name'] === row['Source Station Name'] && row['Station Code'] !== row['Source Station']) ? "⚠️ Station name/code mismatch." : "✅ Station names consistent.", description: 'Verifies station name consistency.' },
-            { name: 'Zero Distance Check', fn: data => data.some((row, i) => i > 0 && row.Distance === data[i-1].Distance) ? "⚠️ Zero distance between stations." : "✅ Valid distances.", description: 'Detects missing distance increments.' },
-            { name: 'Invalid SEQ', fn: data => data.some(row => row.SEQ <= 0) ? "⚠️ Invalid SEQ numbers." : "✅ Valid SEQ numbers.", description: 'Checks for non-positive SEQ values.' },
-            { name: 'Time Format Anomaly', fn: data => data.some(row => isNaN(row['Arr Time']) || isNaN(row['Dep Time'])) ? "⚠️ Invalid time formats." : "✅ Valid time formats.", description: 'Ensures numeric time values.' },
-            { name: 'Route Loop Detection', fn: data => data.some((row, i) => data.slice(i+1).some(r => r['Station Code'] === row['Station Code'])) ? "⚠️ Route loops detected." : "✅ No route loops.", description: 'Identifies repeated stations.' },
+            // Route Analysis (20)
+            { name: 'Route Distance Classification', fn: data => data[0].Distance > 1000 ? "Long-haul route" : data[0].Distance > 500 ? "Medium-haul route" : "Short-haul route", description: 'Classifies route based on distance.' },
+            { name: 'Estimated Travel Time', fn: data => `Estimated travel time: ${(data[0].Distance / 60).toFixed(1)} hours (assuming 60 km/h average speed)`, description: 'Estimates travel duration.' },
+            { name: 'Fuel Consumption Estimate', fn: data => `Estimated fuel: ${(data[0].Distance / 3).toFixed(1)} L (assuming 3 km/L)`, description: 'Predicts fuel usage.' },
+            { name: 'Station Connectivity Score', fn: data => {
+                const station = data[0]['Source Station'];
+                const connections = trainData.filter(row => row['Source Station'] === station || row['Destination Station'] === station).length;
+                return `Connectivity score: ${Math.min(connections / 50 * 100, 100).toFixed(1)}%`;
+            }, description: 'Measures station connectivity.' },
+            { name: 'Route Popularity', fn: data => {
+                const route = `${data[0]['Source Station']}-${data[0]['Destination Station']}`;
+                const count = trainData.filter(row => `${row['Source Station']}-${row['Destination Station']}` === route).length;
+                return `Route popularity: ${count} trains`;
+            }, description: 'Counts trains on the same route.' },
+            { name: 'Major Hub Detection', fn: data => {
+                const station = data[0]['Source Station'];
+                const connections = trainData.filter(row => row['Source Station'] === station || row['Destination Station'] === station).length;
+                return connections > 50 ? "Major railway hub" : "Regular station";
+            }, description: 'Identifies major hubs.' },
+            { name: 'Route Efficiency', fn: data => `Efficiency: ${(data[0].Distance / 2).toFixed(1)} km/stop (assuming 2 stops)`, description: 'Measures distance per stop.' },
+            { name: 'Carbon Footprint Estimate', fn: data => `Carbon footprint: ${(data[0].Distance * 0.02).toFixed(1)} kg CO2`, description: 'Estimates emissions.' },
+            { name: 'Train Density Analysis', fn: data => {
+                const route = `${data[0]['Source Station']}-${data[0]['Destination Station']}`;
+                const count = trainData.filter(row => `${row['Source Station']}-${row['Destination Station']}` === route).length;
+                return count > 10 ? "High train density" : "Low train density";
+            }, description: 'Assesses route congestion.' },
+            { name: 'Distance Anomaly Detection', fn: data => data[0].Distance > 3000 ? "⚠️ Unusually long route" : "✅ Normal route length", description: 'Detects extreme distances.' },
+            { name: 'Route Redundancy Check', fn: data => {
+                const reverse = trainData.filter(row => row['Source Station'] === data[0]['Destination Station'] && row['Destination Station'] === data[0]['Source Station']).length;
+                return reverse > 5 ? "Possible redundant route" : "Unique route";
+            }, description: 'Checks for reverse routes.' },
+            { name: 'Passenger Load Forecast', fn: data => data[0].Distance > 1000 ? "High passenger load expected" : "Moderate passenger load", description: 'Predicts passenger volume.' },
+            { name: 'Freight Suitability', fn: data => data[0].Distance > 1500 ? "Suitable for freight" : "Better for passengers", description: 'Assesses freight potential.' },
+            { name: 'Route Safety Score', fn: data => {
+                const score = 100 - (data[0].Distance / 5000 * 20);
+                return `Safety score: ${Math.round(score)}%`;
+            }, description: 'Estimates route safety.' },
+            { name: 'Weather Impact Risk', fn: data => data[0].Distance > 2000 ? "High weather impact risk" : "Low weather impact risk", description: 'Assesses weather-related risks.' },
+            { name: 'Tourist Route Potential', fn: data => data[0].Distance > 800 && data[0]['Train Name'].toLowerCase().includes('express') ? "High tourist potential" : "Regular route", description: 'Identifies tourist routes.' },
+            { name: 'Maintenance Frequency', fn: data => data[0].Distance > 1500 ? "Frequent maintenance required" : "Standard maintenance schedule", description: 'Predicts maintenance needs.' },
+            { name: 'Operational Cost Estimate', fn: data => `Estimated cost: ₹${(data[0].Distance * 0.5).toFixed(0)}`, description: 'Estimates operational costs.' },
+            { name: 'Route Electrification Suitability', fn: data => data[0].Distance > 1000 ? "Suitable for electrification" : "Diesel preferred", description: 'Assesses electrification potential.' },
+            { name: 'Train Speed Potential', fn: data => data[0].Distance > 1000 ? "High-speed potential" : "Standard speed suitable", description: 'Evaluates speed upgrades.' },
 
-            // Predictive Analytics (30)
-            { name: 'Delay Prediction', fn: data => {
-                const stops = data.filter(row => row['Arr Time'] != null && row['Dep Time'] != null);
-                const avgStop = stops.length ? stops.reduce((sum, row) => sum + (row['Dep Time'] - row['Arr Time']) * 24 * 60, 0) / stops.length : 0;
-                const delay = avgStop > 5 ? Math.round((avgStop - 5) * data.length) : 0;
-                return delay > 0 ? `Predicted delay: ${delay} minutes` : "No significant delay expected.";
-            }, description: 'Estimates total delay based on stop durations.' },
-            { name: 'Maintenance Urgency', fn: sensor => sensor["Wheel Wear (%)"] > 80 ? "Critical maintenance needed in 24 hours." : "Maintenance not urgent.", description: 'Predicts maintenance urgency.' },
-            { name: 'Crowd Density Forecast', fn: data => {
-                const longStops = data.filter(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 10).length;
-                const distance = data[data.length-1]?.Distance ?? 0;
-                return longStops > 2 || distance > 500 ? "High crowd density at major stations." : "Low to moderate crowd density.";
-            }, description: 'Predicts station crowding.' },
-            { name: 'Fuel Consumption Forecast', fn: sensor => `Predicted fuel use: ${(100 / sensor["Fuel Efficiency (km/L)"]).toFixed(2)} L/100km`, description: 'Estimates fuel consumption.' },
-            { name: 'Battery Life Prediction', fn: sensor => sensor["Battery Voltage (V)"] < 11.5 ? "Battery replacement needed soon." : "Battery life sufficient.", description: 'Predicts battery health.' },
-            { name: 'Brake Failure Risk', fn: sensor => sensor["Brake Temperature (°C)"] > 100 ? "High risk of brake failure." : "Low brake failure risk.", description: 'Assesses brake reliability.' },
-            { name: 'Vibration Trend Analysis', fn: sensor => sensor["Axle Vibration (mm/s)"] > sensorDataHistory["Axle Vibration (mm/s)"].slice(-2)[0] ? "Increasing vibration trend." : "Stable vibration.", description: 'Analyzes vibration trends.' },
-            { name: 'Engine Stress Forecast', fn: sensor => sensor["Engine Load (%)"] > 90 ? "High engine stress expected." : "Normal engine operation.", description: 'Predicts engine stress.' },
-            { name: 'Travel Time Estimate', fn: data => {
-                const totalTime = (data[data.length-1]['Arr Time'] - data[0]['Dep Time']) * 24 * 60;
-                return `Estimated travel time: ${Math.round(totalTime)} minutes`;
-            }, description: 'Calculates total journey time.' },
-            { name: 'Delay Impact Score', fn: data => {
-                const delays = data.reduce((sum, row) => sum + Math.max((row['Dep Time'] - row['Arr Time']) * 24 * 60 - 5, 0), 0);
-                return `Delay impact: ${Math.round(delays)} minutes`;
-            }, description: 'Quantifies delay impact.' },
-            { name: 'Station Congestion Risk', fn: data => data.filter(row => row['Station Code'] === data[0]['Source Station'] || row['Station Code'] === data[data.length-1]['Destination Station']).length > 1 ? "High congestion at terminals." : "Low terminal congestion.", description: 'Predicts terminal crowding.' },
-            { name: 'Maintenance Cost Estimate', fn: sensor => {
-                const cost = (sensor["Wheel Wear (%)"] > 70 ? 5000 : 0) + (sensor["Brake Temperature (°C)"] > 90 ? 3000 : 0);
-                return `Estimated maintenance cost: ₹${cost}`;
-            }, description: 'Estimates repair costs.' },
-            { name: 'Route Efficiency Score', fn: data => {
-                const stops = data.length;
-                const distance = data[data.length-1].Distance;
-                return `Route efficiency: ${(distance / stops).toFixed(1)} km/stop`;
-            }, description: 'Measures route efficiency.' },
-            { name: 'Passenger Load Prediction', fn: data => data[0].Distance > 300 ? "High passenger load expected." : "Moderate passenger load.", description: 'Predicts passenger volume.' },
-            { name: 'Weather Impact Risk', fn: data => data.length > 10 ? "Higher weather impact risk due to long route." : "Low weather impact risk.", description: 'Assesses weather-related delays.' },
-            { name: 'Train Reliability Score', fn: sensor => {
-                const score = 100 - (sensor["Wheel Wear (%)"] / 2 + sensor["Engine Load (%)"] / 4);
+            // Train Categorization (20)
+            { name: 'Train Type Classification', fn: data => data[0]['Train Name'].toLowerCase().includes('express') ? "Express train" : data[0]['Train Name'].toLowerCase().includes('mail') ? "Mail train" : "Local/Other", description: 'Classifies train type.' },
+            { name: 'Luxury Train Detection', fn: data => data[0]['Train Name'].toLowerCase().includes('shatabdi') || data[0]['Train Name'].toLowerCase().includes('rajdhani') ? "Luxury train" : "Regular train", description: 'Identifies premium trains.' },
+            { name: 'Commuter Train Check', fn: data => data[0].Distance < 200 ? "Commuter train" : "Non-commuter train", description: 'Detects commuter routes.' },
+            { name: 'Long-Haul Train', fn: data => data[0].Distance > 1500 ? "Long-haul train" : "Short/medium-haul train", description: 'Identifies long-distance trains.' },
+            { name: 'Express Train Validation', fn: data => data[0]['Train Name'].toLowerCase().includes('express') && data[0].Distance > 500 ? "True express train" : "Not express", description: 'Validates express status.' },
+            { name: 'Freight Train Potential', fn: data => data[0]['Train Name'].toLowerCase().includes('goods') ? "Freight train" : "Passenger train", description: 'Detects freight trains.' },
+            { name: 'Heritage Train Detection', fn: data => data[0]['Train Name'].toLowerCase().includes('heritage') || data[0]['Train Name'].toLowerCase().includes('palace') ? "Heritage train" : "Regular train", description: 'Identifies heritage trains.' },
+            { name: 'Train Priority Score', fn: data => {
+                const score = data[0]['Train Name'].toLowerCase().includes('shatabdi') ? 90 : data[0]['Train Name'].toLowerCase().includes('express') ? 70 : 50;
+                return `Priority score: ${score}%`;
+            }, description: 'Assigns train priority.' },
+            { name: 'Superfast Train Check', fn: data => data[0]['Train Name'].toLowerCase().includes('superfast') ? "Superfast train" : "Regular train", description: 'Detects superfast trains.' },
+            { name: 'Train Age Estimation', fn: data => data[0].Distance > 2000 ? "Older train likely" : "Modern train possible", description: 'Estimates train age.' },
+            { name: 'Passenger Comfort Rating', fn: data => data[0]['Train Name'].toLowerCase().includes('rajdhani') ? "High comfort" : "Standard comfort", description: 'Rates passenger comfort.' },
+            { name: 'Train Reliability Index', fn: data => {
+                const score = 100 - (data[0].Distance / 4000 * 20);
                 return `Reliability: ${Math.round(score)}%`;
-            }, description: 'Calculates train reliability.' },
-            { name: 'Stop Time Optimization', fn: data => {
-                const longStops = data.filter(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 15).length;
-                return longStops > 0 ? `Optimize ${longStops} stops to reduce delays.` : "Stop times optimized.";
-            }, description: 'Suggests stop time reductions.' },
-            { name: 'Energy Consumption Forecast', fn: sensor => `Energy use: ${(sensor["Engine Load (%)"] * 0.5).toFixed(1)} kWh/km`, description: 'Predicts energy usage.' },
-            { name: 'Brake Wear Rate', fn: sensor => sensor["Brake Temperature (°C)"] > 95 ? "High brake wear rate." : "Normal brake wear.", description: 'Estimates brake degradation rate.' },
-            { name: 'Axle Failure Risk', fn: sensor => sensor["Axle Vibration (mm/s)"] > 3 ? "Elevated axle failure risk." : "Low axle failure risk.", description: 'Predicts axle issues.' },
-            { name: 'Route Delay Trend', fn: data => {
-                const delays = data.map(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60);
-                return delays.slice(-1)[0] > delays[0] ? "Increasing delay trend." : "Stable delay trend.";
-            }, description: 'Analyzes delay trends.' },
-            { name: 'Station Dwell Time Forecast', fn: data => {
-                const avgDwell = data.reduce((sum, row) => sum + (row['Dep Time'] - row['Arr Time']) * 24 * 60, 0) / data.length;
-                return `Average dwell time: ${avgDwell.toFixed(1)} minutes`;
-            }, description: 'Predicts station dwell times.' },
-            { name: 'Maintenance Interval Prediction', fn: sensor => sensor["Wheel Wear (%)"] > 75 ? "Maintenance needed in 1000 km." : "Maintenance in 5000 km.", description: 'Predicts maintenance intervals.' },
-            { name: 'Train Speed Estimate', fn: data => {
-                const time = (data[data.length-1]['Arr Time'] - data[0]['Dep Time']) * 24;
-                const speed = data[data.length-1].Distance / time;
-                return `Average speed: ${speed.toFixed(1)} km/h`;
-            }, description: 'Estimates average speed.' },
-            { name: 'Route Congestion Forecast', fn: data => data.length > 15 ? "High route congestion expected." : "Low route congestion.", description: 'Predicts route crowding.' },
-            { name: 'Sensor Drift Detection', fn: sensor => sensorDataHistory["Brake Temperature (°C)"].length > 5 && Math.abs(sensor["Brake Temperature (°C)"] - sensorDataHistory["Brake Temperature (°C)"][0]) > 20 ? "Sensor drift detected." : "No sensor drift.", description: 'Identifies sensor calibration issues.' },
-            { name: 'Emergency Stop Risk', fn: sensor => sensor["Brake Temperature (°C)"] > 105 ? "High emergency stop risk." : "Low emergency stop risk.", description: 'Predicts emergency stop likelihood.' },
-            { name: 'Passenger Comfort Score', fn: sensor => {
-                const score = 100 - sensor["Axle Vibration (mm/s)"] * 10;
-                return `Comfort score: ${Math.round(score)}%`;
-            }, description: 'Assesses passenger comfort.' },
-            { name: 'Operational Risk Index', fn: sensor => {
-                const risk = sensor["Wheel Wear (%)"] / 2 + sensor["Brake Temperature (°C)"] / 5;
-                return `Operational risk: ${Math.round(risk)}%`;
-            }, description: 'Calculates overall risk.' },
-            { name: 'Schedule Adherence Forecast', fn: data => {
-                const adherence = data.filter(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 <= 5).length / data.length;
-                return `Schedule adherence: ${(adherence * 100).toFixed(1)}%`;
-            }, description: 'Predicts schedule reliability.' },
+            }, description: 'Measures train reliability.' },
+            { name: 'Train Punctuality Forecast', fn: data => data[0].Distance < 500 ? "High punctuality expected" : "Moderate punctuality", description: 'Predicts punctuality.' },
+            { name: 'Train Capacity Estimate', fn: data => data[0].Distance > 1000 ? "High capacity train" : "Standard capacity", description: 'Estimates train capacity.' },
+            { name: 'Train Modernization Need', fn: data => data[0].Distance > 2500 ? "Modernization recommended" : "Current setup sufficient", description: 'Assesses modernization needs.' },
+            { name: 'Train Route Exclusivity', fn: data => {
+                const route = `${data[0]['Source Station']}-${data[0]['Destination Station']}`;
+                const count = trainData.filter(row => `${row['Source Station']}-${row['Destination Station']}` === route).length;
+                return count === 1 ? "Exclusive route" : "Shared route";
+            }, description: 'Checks route exclusivity.' },
+            { name: 'Train Demand Forecast', fn: data => data[0].Distance > 800 ? "High demand expected" : "Moderate demand", description: 'Predicts train demand.' },
+            { name: 'Train Upgrade Potential', fn: data => data[0]['Train Name'].toLowerCase().includes('express') ? "Upgrade to superfast" : "No upgrade needed", description: 'Suggests train upgrades.' },
+            { name: 'Train Service Frequency', fn: data => {
+                const route = `${data[0]['Source Station']}-${data[0]['Destination Station']}`;
+                const count = trainData.filter(row => `${row['Source Station']}-${row['Destination Station']}` === route).length;
+                return `Service frequency: ${count} trains/day`;
+            }, description: 'Estimates service frequency.' },
+            { name: 'Train Route Competitiveness', fn: data => {
+                const route = `${data[0]['Source Station']}-${data[0]['Destination Station']}`;
+                const count = trainData.filter(row => `${row['Source Station']}-${row['Destination Station']}` === route).length;
+                return count > 5 ? "Highly competitive route" : "Less competitive route";
+            }, description: 'Assesses route competition.' },
 
-            // Optimization (20)
-            { name: 'Schedule Optimization', fn: data => {
-                const totalTime = (data[data.length-1]['Arr Time'] - data[0]['Dep Time']) * 24 * 60;
-                return `Optimized travel time: ${Math.round(totalTime * 0.95)} minutes`;
-            }, description: 'Suggests faster schedules.' },
-            { name: 'Stop Reduction', fn: data => {
-                const minorStops = data.filter(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 < 3).length;
-                return minorStops > 0 ? `Reduce ${minorStops} minor stops.` : "No minor stops to reduce.";
-            }, description: 'Recommends fewer stops.' },
-            { name: 'Fuel Optimization', fn: sensor => sensor["Fuel Efficiency (km/L)"] < 3 ? "Adjust engine load to improve fuel efficiency." : "Fuel use optimized.", description: 'Suggests fuel-saving adjustments.' },
-            { name: 'Route Shortening', fn: data => data.length > 10 ? "Consider alternative route with fewer stops." : "Route length optimal.", description: 'Proposes shorter routes.' },
-            { name: 'Maintenance Scheduling', fn: sensor => sensor["Wheel Wear (%)"] > 70 ? "Schedule maintenance at next major station." : "No immediate maintenance needed.", description: 'Optimizes maintenance timing.' },
-            { name: 'Energy Optimization', fn: sensor => sensor["Engine Load (%)"] > 85 ? "Reduce engine load to save energy." : "Energy use optimized.", description: 'Suggests energy-saving measures.' },
-            { name: 'Brake Usage Optimization', fn: sensor => sensor["Brake Temperature (°C)"] > 90 ? "Minimize abrupt braking." : "Braking optimized.", description: 'Reduces brake wear.' },
-            { name: 'Speed Optimization', fn: data => {
-                const speed = data[data.length-1].Distance / ((data[data.length-1]['Arr Time'] - data[0]['Dep Time']) * 24);
-                return speed < 60 ? "Increase speed to reduce travel time." : "Speed optimized.";
-            }, description: 'Suggests speed adjustments.' },
-            { name: 'Crowd Management', fn: data => data.filter(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 10).length > 2 ? "Add staff at long-stop stations." : "Crowd management sufficient.", description: 'Optimizes crowd handling.' },
-            { name: 'Station Dwell Reduction', fn: data => {
-                const longDwells = data.filter(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 8).length;
-                return longDwells > 0 ? `Reduce dwell time at ${longDwells} stations.` : "Dwell times optimized.";
-            }, description: 'Minimizes station dwell times.' },
-            { name: 'Battery Charging Schedule', fn: sensor => sensor["Battery Voltage (V)"] < 11.5 ? "Charge battery at next stop." : "Battery charge sufficient.", description: 'Optimizes battery charging.' },
-            { name: 'Sensor Calibration', fn: sensor => sensorDataHistory["Brake Temperature (°C)"].length > 5 && Math.abs(sensor["Brake Temperature (°C)"] - sensorDataHistory["Brake Temperature (°C)"][0]) > 15 ? "Recalibrate sensors." : "Sensors calibrated.", description: 'Ensures sensor accuracy.' },
-            { name: 'Maintenance Cost Reduction', fn: sensor => sensor["Wheel Wear (%)"] > 70 ? "Replace wheels to avoid major repairs." : "Maintenance costs optimized.", description: 'Minimizes repair costs.' },
-            { name: 'Route Redundancy Removal', fn: data => data.length > 12 ? "Eliminate redundant stops." : "No redundant stops.", description: 'Removes unnecessary stops.' },
-            { name: 'Operational Efficiency', fn: data => {
-                const efficiency = 100 - (data.length / data[data.length-1].Distance) * 100;
-                return `Operational efficiency: ${Math.round(efficiency)}%`;
-            }, description: 'Maximizes operational efficiency.' },
-            { name: 'Delay Mitigation', fn: data => data.some(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 15) ? "Adjust schedule to mitigate delays." : "No delay mitigation needed.", description: 'Reduces delay impact.' },
-            { name: 'Passenger Flow Optimization', fn: data => data[0].Distance > 400 ? "Streamline boarding at major stations." : "Passenger flow optimized.", description: 'Improves passenger movement.' },
-            { name: 'Sensor Data Optimization', fn: sensor => sensorDataHistory["Axle Vibration (mm/s)"].length > 5 && sensor["Axle Vibration (mm/s)"] > 3 ? "Adjust axle alignment." : "Sensor data optimized.", description: 'Optimizes sensor readings.' },
-            { name: 'Emergency Response Plan', fn: sensor => sensor["Brake Temperature (°C)"] > 100 ? "Prepare emergency response team." : "No emergency response needed.", description: 'Plans for emergencies.' },
-            { name: 'Route Safety Optimization', fn: data => data.length > 10 ? "Enhance safety checks on long routes." : "Route safety optimized.", description: 'Improves route safety.' },
+            // Predictive Maintenance (20)
+            { name: 'Maintenance Urgency', fn: data => data[0].Distance > 2000 ? "Urgent maintenance needed" : "Routine maintenance sufficient", description: 'Predicts maintenance urgency.' },
+            { name: 'Wheel Wear Prediction', fn: sensor => sensor["Wheel Wear (%)"] > 80 ? "Critical wheel wear" : "Normal wheel wear", description: 'Predicts wheel degradation.' },
+            { name: 'Brake Failure Risk', fn: sensor => sensor["Brake Temperature (°C)"] > 100 ? "High brake failure risk" : "Low brake failure risk", description: 'Assesses brake reliability.' },
+            { name: 'Engine Stress Forecast', fn: sensor => sensor["Engine Load (%)"] > 90 ? "High engine stress" : "Normal engine operation", description: 'Predicts engine stress.' },
+            { name: 'Battery Life Prediction', fn: sensor => sensor["Battery Voltage (V)"] < 11.5 ? "Battery replacement needed" : "Battery life sufficient", description: 'Predicts battery health.' },
+            { name: 'Fuel Efficiency Dip', fn: sensor => sensor["Fuel Efficiency (km/L)"] < 2.5 ? "Poor fuel efficiency" : "Normal fuel efficiency", description: 'Detects fuel anomalies.' },
+            { name: 'Maintenance Cost Estimate', fn: sensor => {
+                const cost = sensor["Wheel Wear (%)"] > 70 ? 5000 : 0;
+                return `Estimated cost: ₹${cost}`;
+            }, description: 'Estimates maintenance costs.' },
+            { name: 'Maintenance Interval', fn: data => data[0].Distance > 1500 ? "Maintenance every 1000 km" : "Maintenance every 5000 km", description: 'Predicts maintenance intervals.' },
+            { name: 'Component Failure Risk', fn: sensor => sensor["Axle Vibration (mm/s)"] > 3 ? "High component failure risk" : "Low failure risk", description: 'Predicts component issues.' },
+            { name: 'Brake Wear Rate', fn: sensor => sensor["Brake Temperature (°C)"] > 95 ? "High brake wear rate" : "Normal brake wear", description: 'Estimates brake degradation.' },
+            { name: 'Engine Overload Risk', fn: sensor => sensor["Engine Load (%)"] > 95 ? "High engine overload risk" : "Normal engine load", description: 'Detects engine strain.' },
+            { name: 'Battery Voltage Stability', fn: sensor => sensor["Battery Voltage (V)"] < 11 ? "Unstable battery voltage" : "Stable battery voltage", description: 'Assesses battery stability.' },
+            { name: 'Fuel System Health', fn: sensor => sensor["Fuel Efficiency (km/L)"] < 3 ? "Fuel system issues detected" : "Fuel system healthy", description: 'Evaluates fuel system.' },
+            { name: 'Axle Maintenance Need', fn: sensor => sensor["Axle Vibration (mm/s)"] > 3.5 ? "Axle maintenance required" : "Axle in good condition", description: 'Predicts axle maintenance.' },
+            { name: 'Maintenance Priority', fn: data => data[0].Distance > 2500 ? "High priority maintenance" : "Standard priority", description: 'Prioritizes maintenance.' },
+            { name: 'Sensor Anomaly Detection', fn: sensor => sensor["Brake Temperature (°C)"] > 110 ? "Sensor anomaly detected" : "Sensors normal", description: 'Detects sensor issues.' },
+            { name: 'Maintenance Scheduling', fn: data => data[0].Distance > 2000 ? "Schedule at next major station" : "No immediate scheduling needed", description: 'Optimizes maintenance timing.' },
+            { name: 'Component Lifespan Forecast', fn: sensor => sensor["Wheel Wear (%)"] > 75 ? "Replace components soon" : "Components have sufficient lifespan", description: 'Predicts component lifespan.' },
+            { name: 'Emergency Maintenance Risk', fn: sensor => sensor["Brake Temperature (°C)"] > 105 ? "High emergency maintenance risk" : "Low risk", description: 'Predicts emergency needs.' },
+            { name: 'Maintenance Optimization', fn: data => data[0].Distance > 1800 ? "Optimize maintenance for long routes" : "Standard maintenance sufficient", description: 'Optimizes maintenance plans.' },
 
             // Personalization (20)
-            { name: 'User Preference Learning', fn: () => {
+            { name: 'User Route Preference', fn: data => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                return prefs.favoriteTrains?.length ? `Personalized for ${prefs.favoriteTrains.length} favorite trains.` : "No preferences set.";
-            }, description: 'Adapts to user preferences.' },
+                return prefs.favoriteRoutes?.includes(`${data[0]['Source Station']}-${data[0]['Destination Station']}`) ? "Favorite route detected" : "Add to favorite routes";
+            }, description: 'Matches user route preferences.' },
+            { name: 'Distance Preference Match', fn: data => {
+                const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
+                const maxDistance = prefs.maxDistance || 1000;
+                return data[0].Distance <= maxDistance ? "Matches your distance preference" : "Exceeds your distance preference";
+            }, description: 'Aligns with user distance preferences.' },
             { name: 'Favorite Train Alerts', fn: data => {
                 const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-                return favorites.includes(data[0]['Train No'].toString()) ? "Favorite train alert enabled." : "Add to favorites for alerts.";
+                return favorites.includes(data[0]['Train No'].toString()) ? "Favorite train alert enabled" : "Add to favorites for alerts";
             }, description: 'Notifies for favorite trains.' },
-            { name: 'Custom THI Thresholds', fn: sensor => {
+            { name: 'Custom THI Threshold', fn: sensor => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
                 const threshold = prefs.thiThreshold || 80;
-                return calculateTHI(sensor, []) < threshold ? `THI below your threshold of ${threshold}.` : `THI meets your threshold of ${threshold}.`;
+                return calculateTHI(sensor, 0) < threshold ? `THI below your threshold of ${threshold}` : `THI meets your threshold of ${threshold}`;
             }, description: 'Uses user-defined THI thresholds.' },
-            { name: 'Personalized Delay Alerts', fn: data => {
-                const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                const delayThreshold = prefs.delayThreshold || 10;
-                const delay = aiFeatures.find(f => f.name === 'Delay Prediction').fn(data);
-                return delay.includes('minutes') && parseInt(delay) > delayThreshold ? `Delay exceeds your threshold of ${delayThreshold} minutes.` : "Delay within your threshold.";
-            }, description: 'Alerts based on user delay preferences.' },
-            { name: 'Preferred Station Notifications', fn: data => {
+            { name: 'Preferred Station Alerts', fn: data => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
                 const stations = prefs.preferredStations || [];
-                return data.some(row => stations.includes(row['Station Code'])) ? "Preferred stations in route." : "No preferred stations in route.";
+                return stations.includes(data[0]['Source Station']) || stations.includes(data[0]['Destination Station']) ? "Preferred station in route" : "No preferred stations";
             }, description: 'Notifies for preferred stations.' },
             { name: 'Custom Report Format', fn: () => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                return prefs.reportFormat || "Default report format applied.";
-            }, description: 'Generates reports in user-preferred format.' },
-            { name: 'User Activity Tracking', fn: () => {
+                return prefs.reportFormat || "Default report format applied";
+            }, description: 'Generates user-preferred reports.' },
+            { name: 'User Activity Insights', fn: () => {
                 const activity = JSON.parse(localStorage.getItem('userActivity') || '[]');
-                return activity.length ? `Tracked ${activity.length} user actions.` : "No user activity tracked.";
-            }, description: 'Monitors user interactions.' },
-            { name: 'Personalized UI Theme', fn: () => {
+                return activity.length ? `Tracked ${activity.length} user actions` : "No user activity tracked";
+            }, description: 'Analyzes user interactions.' },
+            { name: 'Custom UI Theme', fn: () => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                return prefs.theme || "Default theme applied.";
-            }, description: 'Applies user-selected UI theme.' },
-            { name: 'Favorite Route Suggestions', fn: data => {
+                return prefs.theme || "Default theme applied";
+            }, description: 'Applies user-selected theme.' },
+            { name: 'Route Recommendation', fn: data => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                const routes = prefs.favoriteRoutes || [];
-                return routes.includes(data[0]['Source Station'] + '-' + data[data.length-1]['Destination Station']) ? "Favorite route detected." : "Add route to favorites.";
-            }, description: 'Suggests favorite routes.' },
-            { name: 'Custom Alert Frequency', fn: () => {
+                const maxDistance = prefs.maxDistance || 1000;
+                const similar = trainData.filter(row => row.Distance <= maxDistance && row['Train No'] !== data[0]['Train No']).slice(0, 3);
+                return similar.length ? `Recommended routes: ${similar.map(r => r['Train Name']).join(', ')}` : "No similar routes found";
+            }, description: 'Suggests similar routes.' },
+            { name: 'Alert Frequency Setting', fn: () => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
                 return `Alert frequency: ${prefs.alertFrequency || 'default'}`;
-            }, description: 'Sets user-defined alert intervals.' },
+            }, description: 'Sets user alert intervals.' },
             { name: 'Preferred Train Type', fn: data => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
                 const trainType = prefs.trainType || 'All';
-                return trainType === 'All' || data[0]['Train Name'].includes(trainType) ? "Matches preferred train type." : "Different train type.";
-            }, description: 'Filters by preferred train types.' },
+                return trainType === 'All' || data[0]['Train Name'].toLowerCase().includes(trainType.toLowerCase()) ? "Matches preferred train type" : "Different train type";
+            }, description: 'Filters by train type.' },
             { name: 'User Behavior Analysis', fn: () => {
                 const activity = JSON.parse(localStorage.getItem('userActivity') || '[]');
-                return activity.length > 5 ? "Analyzed user behavior patterns." : "Insufficient data for behavior analysis.";
+                return activity.length > 5 ? "Analyzed user behavior patterns" : "Insufficient data for analysis";
             }, description: 'Analyzes user behavior.' },
             { name: 'Custom Dashboard Widgets', fn: () => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                return prefs.widgets?.length ? `Displaying ${prefs.widgets.length} custom widgets.` : "No custom widgets set.";
+                return prefs.widgets?.length ? `Displaying ${prefs.widgets.length} custom widgets` : "No custom widgets set";
             }, description: 'Shows user-selected widgets.' },
             { name: 'Personalized Maintenance Alerts', fn: sensor => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                const maintenanceThreshold = prefs.maintenanceThreshold || 70;
-                return sensor["Wheel Wear (%)"] > maintenanceThreshold ? `Maintenance alert for wheel wear above ${maintenanceThreshold}%.` : "No maintenance alerts.";
+                const threshold = prefs.maintenanceThreshold || 70;
+                return sensor["Wheel Wear (%)"] > threshold ? `Maintenance alert: Wheel wear above ${threshold}%` : "No maintenance alerts";
             }, description: 'Custom maintenance notifications.' },
-            { name: 'User Feedback Prioritization', fn: () => {
+            { name: 'Feedback Prioritization', fn: () => {
                 const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
-                return feedback.length ? `Prioritized ${feedback.length} feedback items.` : "No feedback to prioritize.";
+                return feedback.length ? `Prioritized ${feedback.length} feedback items` : "No feedback to prioritize";
             }, description: 'Prioritizes user feedback.' },
-            { name: 'Custom Map Settings', fn: () => {
+            { name: 'Custom Map Style', fn: () => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                return prefs.mapStyle || "Default map style applied.";
+                return prefs.mapStyle || "Default map style applied";
             }, description: 'Applies user map preferences.' },
-            { name: 'Preferred Language Support', fn: () => {
+            { name: 'Language Preference', fn: () => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                return prefs.language || "English language applied.";
+                return prefs.language || "English language applied";
             }, description: 'Supports user-preferred language.' },
-            { name: 'User Interaction Optimization', fn: () => {
+            { name: 'Interaction Optimization', fn: () => {
                 const activity = JSON.parse(localStorage.getItem('userActivity') || '[]');
-                return activity.length > 10 ? "Optimized UI based on interactions." : "Default UI layout.";
+                return activity.length > 10 ? "Optimized UI based on interactions" : "Default UI layout";
             }, description: 'Optimizes UI based on user actions.' },
             { name: 'Custom Sensor Alerts', fn: sensor => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                const sensorThreshold = prefs.sensorThreshold || 90;
-                return sensor["Brake Temperature (°C)"] > sensorThreshold ? `Sensor alert: Brake temperature above ${sensorThreshold}°C.` : "No sensor alerts.";
+                const threshold = prefs.sensorThreshold || 90;
+                return sensor["Brake Temperature (°C)"] > threshold ? `Sensor alert: Brake temperature above ${threshold}°C` : "No sensor alerts";
             }, description: 'Custom sensor notifications.' },
-            { name: 'Personalized Route Alerts', fn: data => {
+            { name: 'Route Distance Alerts', fn: data => {
                 const prefs = JSON.parse(localStorage.getItem('userPrefs') || '{}');
-                const distanceThreshold = prefs.distanceThreshold || 500;
-                return data[data.length-1].Distance > distanceThreshold ? `Long route alert: ${data[data.length-1].Distance} km.` : "Route within threshold.";
+                const threshold = prefs.distanceThreshold || 1000;
+                return data[0].Distance > threshold ? `Long route alert: ${data[0].Distance} km` : "Route within threshold";
             }, description: 'Alerts for long routes.' },
 
-            // Sentiment and Feedback Analysis (10)
+            // Sentiment and Feedback Analysis (20)
             { name: 'Feedback Sentiment Analysis', fn: message => {
                 const positiveWords = ['great', 'good', 'awesome', 'excellent', 'happy'];
                 const negativeWords = ['bad', 'poor', 'terrible', 'awful', 'sad'];
                 message = message.toLowerCase();
                 return positiveWords.some(word => message.includes(word)) ? "Positive sentiment" : negativeWords.some(word => message.includes(word)) ? "Negative sentiment" : "Neutral sentiment";
             }, description: 'Analyzes feedback sentiment.' },
-            { name: 'Feedback Urgency Detection', fn: message => message.toLowerCase().includes('urgent') ? "Urgent feedback detected." : "Non-urgent feedback.", description: 'Identifies urgent feedback.' },
+            { name: 'Feedback Urgency Detection', fn: message => message.toLowerCase().includes('urgent') ? "Urgent feedback detected" : "Non-urgent feedback", description: 'Identifies urgent feedback.' },
             { name: 'Feedback Topic Extraction', fn: message => {
                 const topics = ['delay', 'maintenance', 'crowd', 'cleanliness', 'service'];
                 return topics.find(topic => message.toLowerCase().includes(topic)) || "General feedback";
             }, description: 'Extracts feedback topics.' },
             { name: 'Feedback Trend Analysis', fn: () => {
                 const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
-                return feedback.length > 3 ? "Feedback trends analyzed." : "Insufficient feedback for trends.";
+                return feedback.length > 3 ? "Feedback trends analyzed" : "Insufficient feedback for trends";
             }, description: 'Analyzes feedback trends.' },
             { name: 'User Satisfaction Score', fn: () => {
                 const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
                 const positive = feedback.filter(f => f.sentiment === 'Positive').length;
                 return `Satisfaction: ${feedback.length ? Math.round((positive / feedback.length) * 100) : 0}%`;
             }, description: 'Calculates user satisfaction.' },
-            { name: 'Feedback Actionability', fn: message => message.length > 20 ? "Actionable feedback provided." : "Feedback too brief.", description: 'Assesses feedback actionability.' },
-            { name: 'Feedback Response Suggestion', fn: message => message.toLowerCase().includes('delay') ? "Suggested response: Address delay concerns." : "Generic response suggested.", description: 'Suggests feedback responses.' },
+            { name: 'Feedback Actionability', fn: message => message.length > 20 ? "Actionable feedback provided" : "Feedback too brief", description: 'Assesses feedback actionability.' },
+            { name: 'Feedback Response Suggestion', fn: message => message.toLowerCase().includes('delay') ? "Suggested response: Address delay concerns" : "Generic response suggested", description: 'Suggests feedback responses.' },
             { name: 'Feedback Sentiment Trend', fn: () => {
                 const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]').slice(-5);
-                return feedback.length > 2 && feedback.every(f => f.sentiment === 'Positive') ? "Positive sentiment trend." : "Mixed sentiment trend.";
+                return feedback.length > 2 && feedback.every(f => f.sentiment === 'Positive') ? "Positive sentiment trend" : "Mixed sentiment trend";
             }, description: 'Tracks sentiment trends.' },
             { name: 'Feedback Volume Analysis', fn: () => {
                 const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
                 return `Feedback volume: ${feedback.length} entries`;
             }, description: 'Measures feedback volume.' },
-            { name: 'Feedback Priority Scoring', fn: message => message.toLowerCase().includes('safety') ? "High priority feedback." : "Standard priority feedback.", description: 'Prioritizes safety-related feedback.' }
+            { name: 'Feedback Priority Scoring', fn: message => message.toLowerCase().includes('safety') ? "High priority feedback" : "Standard priority feedback", description: 'Prioritizes safety-related feedback.' },
+            { name: 'Feedback Keyword Analysis', fn: message => {
+                const keywords = message.toLowerCase().split(' ').filter(w => w.length > 3);
+                return `Key feedback keywords: ${keywords.slice(0, 3).join(', ')}`;
+            }, description: 'Extracts key feedback terms.' },
+            { name: 'Feedback Sentiment Intensity', fn: message => {
+                const intensity = message.toLowerCase().includes('very') || message.toLowerCase().includes('extremely') ? "High intensity" : "Normal intensity";
+                return `Sentiment intensity: ${intensity}`;
+            }, description: 'Measures feedback intensity.' },
+            { name: 'Feedback Action Plan', fn: message => message.toLowerCase().includes('maintenance') ? "Plan: Schedule maintenance review" : "Plan: General review", description: 'Suggests action plans.' },
+            { name: 'Feedback Category Distribution', fn: () => {
+                const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
+                const categories = feedback.map(f => aiFeatures.find(fe => fe.name === 'Feedback Topic Extraction').fn(f.message));
+                return `Feedback categories: ${[...new Set(categories)].join(', ')}`;
+            }, description: 'Analyzes feedback categories.' },
+            { name: 'Feedback Response Time', fn: () => {
+                const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
+                return feedback.length ? "Average response time: 24 hours" : "No feedback to respond";
+            }, description: 'Estimates response time.' },
+            { name: 'Feedback Impact Score', fn: message => message.toLowerCase().includes('urgent') || message.toLowerCase().includes('safety') ? "High impact feedback" : "Moderate impact feedback", description: 'Scores feedback impact.' },
+            { name: 'Feedback Trend Prediction', fn: () => {
+                const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
+                return feedback.length > 5 ? "Predicting continued feedback trends" : "Insufficient data for prediction";
+            }, description: 'Predicts feedback trends.' },
+            { name: 'Feedback Engagement Level', fn: message => message.length > 50 ? "High engagement feedback" : "Low engagement feedback", description: 'Measures feedback engagement.' },
+            { name: 'Feedback Resolution Status', fn: message => message.toLowerCase().includes('resolved') ? "Feedback resolved" : "Feedback pending", description: 'Tracks feedback resolution.' },
+            { name: 'Feedback User Retention', fn: () => {
+                const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
+                return feedback.length > 3 ? "High user retention likely" : "Low user retention";
+            }, description: 'Predicts user retention from feedback.' }
         ];
 
         function initializeAI() {
@@ -722,17 +734,17 @@
                 return;
             }
 
-            // Display schedule
-            filteredData.forEach(row => {
-                const isSource = row['Station Code'] === row['Source Station'];
-                const isDest = row['Station Code'] === row['Destination Station'];
+            // Display schedule (source and destination only)
+            const schedule = [
+                { seq: 1, station: `${filteredData[0]['Source Station Name']} (${filteredData[0]['Source Station']})`, distance: 0 },
+                { seq: 2, station: `${filteredData[0]['Destination Station Name']} (${filteredData[0]['Destination Station']})`, distance: filteredData[0].Distance }
+            ];
+            schedule.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="p-3 border border-gray-600">${row.SEQ ?? 'N/A'}</td>
-                    <td class="p-3 border border-gray-600">${row['Station Name'] ?? 'Unknown'} (${row['Station Code'] ?? 'N/A'}) ${isSource ? '🛤️' : isDest ? '🏁' : ''}</td>
-                    <td class="p-3 border border-gray-600">${decimalToTime(row['Arr Time'])}</td>
-                    <td class="p-3 border border-gray-600">${decimalToTime(row['Dep Time'])}</td>
-                    <td class="p-3 border border-gray-600">${row.Distance ?? 0} km</td>
+                    <td class="p-3 border border-gray-600">${row.seq}</td>
+                    <td class="p-3 border border-gray-600">${row.station} ${row.seq === 1 ? '🛤️' : '🏁'}</td>
+                    <td class="p-3 border border-gray-600">${row.distance} km</td>
                 `;
                 trainTableBody.appendChild(tr);
             });
@@ -778,7 +790,7 @@
             let t = 0;
             const updateInterval = setInterval(() => {
                 const sensorData = generateSensorData();
-                const thi = calculateTHI(sensorData, filteredData);
+                const thi = calculateTHI(sensorData, filteredData[0].Distance);
                 timeSeries.push(t++);
 
                 // Update sensor history
@@ -818,7 +830,7 @@
                 maintenanceSuggestion.innerHTML += `<div class="mt-4">${aiResults.join('')}</div>`;
 
                 if (t > 100) clearInterval(updateInterval);
-            }, 5000); // Update every 5 seconds for real-time effect
+            }, 5000); // Update every 5 seconds
         });
 
         // Favorites
@@ -833,12 +845,20 @@
                     div.className = 'train-card glassmorphism p-4 rounded-lg';
                     div.innerHTML = `
                         <p class="font-bold text-blue-300">${trainNo} - ${train['Train Name'] || 'Unknown'}</p>
-                        <p class="text-sm text-gray-400">From: ${train['Source Station Name'] || 'N/A'} (${train['Source Station']})</p>
-                        <p class="text-sm text-gray-400">To: ${train['Destination Station Name'] || 'N/A'} (${train['Destination Station']})</p>
+                        <p class="text-sm text-gray-400">From: ${train['Source Station Name']} (${train['Source Station']})</p>
+                        <p class="text-sm text-gray-400">To: ${train['Destination Station Name']} (${train['Destination Station']})</p>
+                        <button class="bg-red-600 text-white px-2 py-1 rounded mt-2 hover:bg-red-700" onclick="removeFavorite('${trainNo}')">Remove</button>
                     `;
                     favoritesList.appendChild(div);
                 }
             });
+        }
+
+        function removeFavorite(trainNo) {
+            let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            favorites = favorites.filter(no => no !== trainNo);
+            localStorage.setItem('favorites', JSON.stringify(favorites));
+            updateFavorites();
         }
 
         // Sound toggle
@@ -869,15 +889,15 @@
                 if (layer instanceof L.Marker || layer instanceof L.Polyline) map.removeLayer(layer);
             });
             if (filteredData.length) {
-                filteredData.forEach((row, index) => {
-                    const lat = 20 + index * 0.1; // Mock coordinates
-                    const lon = 78 + index * 0.1;
-                    L.marker([lat, lon]).addTo(map).bindPopup(`${row['Station Name'] || 'Unknown'} (${row['Station Code']})`);
-                    if (index > 0) {
-                        L.polyline([[lat - 0.1, lon - 0.1], [lat, lon]], { color: '#3B82F6' }).addTo(map);
-                    }
+                const coords = [
+                    [20.5937, 78.9629], // Source (mock)
+                    [20.6937, 79.0629]  // Destination (mock)
+                ];
+                coords.forEach((coord, i) => {
+                    L.marker(coord).addTo(map).bindPopup(i === 0 ? filteredData[0]['Source Station Name'] : filteredData[0]['Destination Station Name']);
                 });
-                map.fitBounds(filteredData.map((_, i) => [20 + i * 0.1, 78 + i * 0.1]));
+                L.polyline(coords, { color: '#3B82F6' }).addTo(map);
+                map.fitBounds(coords);
             }
         });
 
@@ -921,13 +941,10 @@
             const report = {
                 trainNo,
                 trainName: filteredData[0]['Train Name'],
-                schedule: filteredData.map(row => ({
-                    station: row['Station Name'],
-                    code: row['Station Code'],
-                    arrival: decimalToTime(row['Arr Time']),
-                    departure: decimalToTime(row['Dep Time']),
-                    distance: row.Distance
-                })),
+                schedule: [
+                    { station: filteredData[0]['Source Station Name'], code: filteredData[0]['Source Station'], distance: 0 },
+                    { station: filteredData[0]['Destination Station Name'], code: filteredData[0]['Destination Station'], distance: filteredData[0].Distance }
+                ],
                 thi: document.getElementById('thi-value').textContent,
                 maintenance: maintenanceSuggestion.textContent,
                 aiInsights: aiFeatures.map(f => ({ name: f.name, result: f.fn(filteredData.length ? filteredData : generateSensorData()) }))
