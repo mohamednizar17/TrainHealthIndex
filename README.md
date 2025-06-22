@@ -123,4 +123,4 @@ project/
 MIT License. See [LICENSE](LICENSE) for details.
 
 ## Contact
-For feedback or issues, use the in-app "Contact Us" section or email [contact@irhealthindex.in](mailto:contact@irhealthindex.in).
+For feedback or issues, use the in-app "Contact Us" section or email [contact@irhealthindex.in](mailto:arnizz077@gmail.com).
