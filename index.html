@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Railways AI-Powered Health Index</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+    <!-- No API key needed - Using free Leaflet + OpenStreetMap -->
+    <style>
+        body {
+            background: linear-gradient(to bottom, #1E3A8A, #111827);
+            font-family: 'Lora', serif;
+            color: #F3F4F6;
+            min-height: 100vh;
+        }
+        .train-animation {
+            animation: moveTrain 12s linear infinite;
+        }
+        @keyframes moveTrain {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100vw); }
+        }
+        .platform-board {
+            background: #1F2937;
+            color: #FBBF24;
+            font-family: 'Courier New', monospace;
+            padding: 0.75rem;
+            border: 3px solid #F97316;
+            transition: box-shadow 0.3s, transform 0.2s;
+        }
+        .platform-board:focus {
+            box-shadow: 0 0 15px #F97316;
+            transform: scale(1.02);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #1F2937;
+            padding: 2.5rem;
+            border-radius: 12px;
+            max-width: 90%;
+            max-height: 85%;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .progress-bar {
+            background: #4B5563;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            background: linear-gradient(to right, #16A34A, #22C55E);
+            height: 100%;
+            transition: width 0.5s ease-in-out;
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .slide-in {
+            animation: slideIn 0.6s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+        button:hover {
+            transform: scale(1.05);
+            transition: transform 0.2s, background-color 0.3s;
+        }
+        #suggestions {
+            background: #1F2937;
+            border: 1px solid #F97316;
+            max-height: 250px;
+            overflow-y: auto;
+            position: absolute;
+            width: 100%;
+            z-index: 20;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #suggestions div {
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #suggestions div:hover {
+            background: #F97316;
+            color: #1F2937;
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .glow-on-hover:hover {
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+        }
+        .train-card {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .train-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <header class="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-center py-6 md:py-8 shadow-lg">
+        <div class="flex justify-between items-center px-4 md:px-8">
+            <div class="flex-1">
+                <h1 class="text-3xl md:text-5xl font-bold flex items-center justify-center">
+                    <i class="fas fa-train mr-3 train-animation"></i> Indian Railways AI-Powered Health Index
+                </h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden md:block">
+                    <p class="text-sm text-blue-200" id="user-welcome">Welcome</p>
+                    <p class="text-xs text-gray-400" id="username-display">User</p>
+                </div>
+                <button id="logout-btn" class="bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition-all">
+                    <i class="fas fa-sign-out-alt"></i> <span class="hidden md:inline">Logout</span>
+                </button>
+            </div>
+        </div>
+        <div class="mt-4 flex justify-center space-x-4 md:hidden">
+            <button id="toggle-dark" class="bg-gray-700 text-white px-4 py-2 rounded-full hover:bg-gray-600 focus:outline-none">
+                <i class="fas fa-moon"></i> Dark Mode
+            </button>
+        </div>
+    </header>
+
+
+    <main class="flex-grow flex items-center justify-center min-h-[80vh] p-2 sm:p-4 md:p-8">
+        <section id="main-content" class="w-full">
+            <div class="glassmorphism p-6 md:p-8 rounded-xl shadow-xl mb-8 glow-on-hover">
+                <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300 slide-in"><i class="fas fa-tachometer-alt"></i> Train Health Index</h2>
+                <div class="mb-6 relative">
+                    <label for="train-number" class="block text-sm font-medium mb-2 text-gray-300">Enter Train Number</label>
+                    <input type="text" id="train-number" class="w-full p-3 platform-board focus:ring-0" placeholder="e.g., 107" aria-label="Train number input" autocomplete="off">
+                    <div id="suggestions" class="hidden"></div>
+                </div>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <button id="get-thi" class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 glow-on-hover">
+                        <i class="fas fa-search"></i> Get Health Index
+                    </button>
+                    <button id="show-ai-features" class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 glow-on-hover">
+                        <i class="fas fa-robot"></i> AI Features
+                    </button>
+                    <button id="export-report" class="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 glow-on-hover">
+                        <i class="fas fa-file-download"></i> Export Report
+                    </button>
+                </div>
+                <div id="train-not-found" class="hidden text-red-400 mt-4">Train not found. Please enter a valid train number.</div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                    <div class="train-card glassmorphism p-6 rounded-lg">
+                        <h3 class="text-xl font-bold mb-4 text-blue-300"><i class="fas fa-calendar-alt"></i> Train Schedule</h3>
+                        <div id="train-table" class="overflow-x-auto fade-in">
+                            <table class="w-full border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-blue-800 text-white">
+                                        <th class="p-3">SEQ</th>
+                                        <th class="p-3">Station (Code)</th>
+                                        <th class="p-3">Arrival</th>
+                                        <th class="p-3">Departure</th>
+                                        <th class="p-3">Distance</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="train-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="train-card glassmorphism p-6 rounded-lg">
+                        <h3 class="text-xl font-bold mb-4 text-blue-300"><i class="fas fa-microchip"></i> Sensor Data & THI</h3>
+                        <div id="sensor-table" class="mb-6 fade-in"></div>
+                        <div id="thi-score" class="mb-6 fade-in">
+                            <p class="text-lg font-bold text-gray-300">THI Score: <span id="thi-value">0</span> / 100</p>
+                            <div class="progress-bar h-6 w-full mt-2">
+                                <div id="thi-progress" class="progress-bar-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div id="maintenance-suggestion" class="mb-6 fade-in text-gray-300"></div>
+                        <canvas id="sensor-chart" class="w-full h-80 fade-in"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glassmorphism p-6 md:p-8 rounded-xl shadow-xl mb-8 glow-on-hover">
+                <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300"><i class="fas fa-star"></i> Favorite Trains</h2>
+                <ul id="favorites-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></ul>
+            </div>
+
+            <div class="glassmorphism p-6 md:p-8 rounded-xl shadow-xl mb-8 glow-on-hover">
+                <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300"><i class="fas fa-map"></i> Route Map & Directions</h2>
+                <div id="route-map" class="h-96 w-full rounded-lg shadow-lg" style="border: 2px solid #3B82F6;"></div>
+                <div id="directions-panel" class="mt-4 p-4 bg-gray-800 rounded-lg hidden" style="max-height: 300px; overflow-y: auto;">
+                    <h3 class="text-lg font-bold mb-2 text-blue-300">Directions</h3>
+                    <div id="directions-text"></div>
+                </div>
+            </div>
+
+            <div class="glassmorphism p-6 md:p-8 rounded-xl shadow-xl mb-8 glow-on-hover">
+                <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300"><i class="fas fa-envelope"></i> Contact Us</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label for="contact-message" class="block text-sm font-medium text-gray-300">Your Feedback</label>
+                        <textarea id="contact-message" class="w-full p-3 border border-gray-500 rounded-md bg-gray-800 text-white" rows="5" aria-label="Feedback textarea"></textarea>
+                    </div>
+                    <button id="contact-submit" class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 glow-on-hover">Send</button>
+                </div>
+                <div id="sentiment-analysis" class="mt-4 text-gray-300"></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="ai-features-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-blue-300"><i class="fas fa-robot"></i> AI Features</h2>
+            <ul id="ai-features-list" class="list-disc pl-6 space-y-2 text-gray-300"></ul>
+            <button id="close-ai-modal" class="bg-gray-600 text-white px-6 py-3 rounded-md hover:bg-gray-700 mt-6">Close</button>
+        </div>
+    </div>
+
+    <footer class="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-center py-6 w-full">
+        <p>© 2025 Indian Railways AI-Powered Health Index | <a href="mailto:contact@irhealthindex.in" class="hover:underline text-blue-300">Contact Us</a></p>
+    </footer>
+
+    <style>
+        /* Extra mobile responsiveness and centering tweaks */
+        @media (max-width: 640px) {
+            #auth-section {
+                grid-template-columns: 1fr !important;
+                gap: 1.5rem !important;
+                margin-bottom: 2rem !important;
+                max-width: 100vw !important;
+                padding: 0 0.5rem;
+            }
+            #login-section, #register-section {
+                max-width: 100vw !important;
+                padding: 1.25rem 0.5rem !important;
+            }
+            .glassmorphism {
+                border-radius: 1rem !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+            }
+            .container, main, footer {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+        }
+        @media (max-width: 400px) {
+            #login-section, #register-section {
+                padding: 0.5rem !important;
+            }
+            h2 {
+                font-size: 1.25rem !important;
+            }
+        }
+    </style>
+    <script>
+        console.log('Script starting...');
+        
+        // === SESSION MANAGEMENT ===
+        const SESSION_TIMEOUT = 3600000; // 1 hour
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded');
+            // Auto-initialize as guest user for direct dashboard access
+            initializeUserSession();
+            // Add logout listener after DOM is ready
+            try {
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', () => {
+                        console.log('Logout clicked');
+                        const confirmLogout = confirm('Are you sure you want to logout?');
+                        if (confirmLogout) {
+                            sessionStorage.clear();
+                            localStorage.removeItem('remember_token');
+                            location.reload();
+                        }
+                    });
+                    console.log('Logout listener attached successfully');
+                } else {
+                    console.error('Logout button not found');
+                }
+            } catch (error) {
+                console.error('Error attaching logout listener:', error);
+            }
+            initializeApp();
+        });
+
+        function initializeUserSession() {
+            // Auto-initialize guest session if no session exists
+            if (!sessionStorage.getItem('auth_token')) {
+                const token = 'guest_' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem('auth_token', token);
+                sessionStorage.setItem('username', 'Guest');
+                sessionStorage.setItem('token_timestamp', Date.now());
+                console.log('Guest session initialized');
+            }
+        }
+
+        // === INDIAN RAILWAY STATION COORDINATES ===
+        const RAILWAY_STATIONS = {
+            'CSMT': { lat: 18.9676, lng: 72.8194, name: 'CST-MUMBAI', fullName: 'Chhatrapati Shivaji Terminus' },
+            'MAO': { lat: 15.3017, lng: 73.8315, name: 'MADGOAN JN.', fullName: 'Madgaon Junction' },
+            'ERS': { lat: 9.9673, lng: 76.2419, name: 'ERNAKULAM. JN', fullName: 'Ernakulam Junction' },
+            'BRC': { lat: 22.3039, lng: 71.9160, name: 'VADODARA JN', fullName: 'Vadodara Junction' },
+            'PNBE': { lat: 25.5941, lng: 85.1376, name: 'PATNA JN', fullName: 'Patna Junction' },
+            'NDLS': { lat: 28.5355, lng: 77.2591, name: 'NEW DELHI', fullName: 'New Delhi Railway Station' },
+            'BCT': { lat: 19.0176, lng: 72.8479, name: 'MUMBAI CENTRAL', fullName: 'Mumbai Central' },
+            'BBS': { lat: 20.2961, lng: 85.8245, name: 'BHUBANESWAR', fullName: 'Bhubaneswar Station' },
+            'HWH': { lat: 22.5726, lng: 88.3639, name: 'HOWRAH', fullName: 'Howrah Junction' },
+            'BJKH': { lat: 22.2670, lng: 88.3519, name: 'BANKURA', fullName: 'Bankura Station' },
+            'CTM': { lat: 23.1815, lng: 79.9864, name: 'CHHINDWARA', fullName: 'Chhindwara Station' },
+            'ITJ': { lat: 24.7745, lng: 75.8577, name: 'INDORE JN.', fullName: 'Indore Junction' }
+        };
+
+        // === LEAFLET MAP INITIALIZATION ===
+        let googleMap; // Leaflet map instance
+        let trainMarkers = [];
+
+        function initializeGoogleMaps() {
+            console.log('initializeLeafletMap called');
+            
+            if (!document.getElementById('route-map')) return; // Element not ready yet
+            
+            const mapElement = document.getElementById('route-map');
+            
+            // Initialize Leaflet map centered on India
+            googleMap = L.map(mapElement).setView([20.5937, 78.9629], 5);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(googleMap);
+            
+            console.log('Leaflet Map initialized successfully');
+        }
+
+        function displayRouteOnMap(trainData) {
+            if (!googleMap) {
+                initializeGoogleMaps();
+            }
+
+            if (!trainData || trainData.length === 0) return;
+
+            // Get source and destination from first record
+            const sourceCode = trainData[0]['Source Station'];
+            const destCode = trainData[0]['Destination Station'];
+            const sourceName = trainData[0]['Source Station Name'];
+            const destName = trainData[0]['Destination Station Name'];
+
+            console.log('Train route:', sourceName, '→', destName);
+            console.log('Station codes:', sourceCode, '→', destCode);
+
+            displayRouteBetweenStations(sourceCode, destCode, sourceName, destName);
+        }
+
+        function displayRouteBetweenStations(sourceCode, destCode, sourceName, destName) {
+            // Clear existing markers
+            trainMarkers.forEach(marker => {
+                if (marker) {
+                    googleMap.removeLayer(marker);
+                }
+            });
+            trainMarkers = [];
+
+            const sourceCoords = RAILWAY_STATIONS[sourceCode];
+            const destCoords = RAILWAY_STATIONS[destCode];
+
+            console.log('Source coords:', sourceCoords);
+            console.log('Dest coords:', destCoords);
+
+            if (!sourceCoords || !destCoords) {
+                console.warn('Station coordinates not found. Available stations:', Object.keys(RAILWAY_STATIONS));
+                return;
+            }
+
+            const stationCoords = [
+                [sourceCoords.lat, sourceCoords.lng],
+                [destCoords.lat, destCoords.lng]
+            ];
+
+            // Create START marker (Green)
+            const startIcon = L.divIcon({
+                html: `<div style="background: #10B981; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.7);">
+                    S
+                </div>`,
+                iconSize: [35, 35],
+                iconAnchor: [17, 17],
+                className: 'custom-marker-start'
+            });
+
+            const startMarker = L.marker([sourceCoords.lat, sourceCoords.lng], { icon: startIcon })
+                .bindPopup(`<div style="font-size: 12px;"><strong>${sourceName}</strong><br/>Code: ${sourceCode}<br/>START STATION</div>`)
+                .addTo(googleMap);
+            
+            trainMarkers.push(startMarker);
+            console.log('START marker added:', sourceName);
+
+            // Create END marker (Red)
+            const endIcon = L.divIcon({
+                html: `<div style="background: #EF4444; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.7);">
+                    E
+                </div>`,
+                iconSize: [35, 35],
+                iconAnchor: [17, 17],
+                className: 'custom-marker-end'
+            });
+
+            const endMarker = L.marker([destCoords.lat, destCoords.lng], { icon: endIcon })
+                .bindPopup(`<div style="font-size: 12px;"><strong>${destName}</strong><br/>Code: ${destCode}<br/>END STATION</div>`)
+                .addTo(googleMap);
+            
+            trainMarkers.push(endMarker);
+            console.log('END marker added:', destName);
+
+            // Draw polyline connecting source to destination
+            const polyline = L.polyline(stationCoords, {
+                color: '#3B82F6',
+                weight: 4,
+                opacity: 0.8,
+                dashArray: '5, 5'
+            }).addTo(googleMap);
+
+            // Fit bounds
+            googleMap.fitBounds(polyline.getBounds(), { padding: [80, 80] });
+
+            // Show directions panel
+            const panel = document.getElementById('directions-panel');
+            const directionText = document.getElementById('directions-text');
+            if (panel) panel.classList.remove('hidden');
+            
+            if (directionText) {
+                const html = `<ul class="list-disc pl-4 space-y-2 text-sm text-gray-300">
+                    <li><strong>Route:</strong> ${sourceName} → ${destName}</li>
+                    <li><strong>Source Code:</strong> ${sourceCode}</li>
+                    <li><strong>Destination Code:</strong> ${destCode}</li>
+                </ul>`;
+                directionText.innerHTML = html;
+            }
+        }
+
+        // === MAIN APPLICATION LOGIC ===
+        function initializeApp() {
+            let trainData = [];
+            let sensorChart;
+            let sensorDataHistory = {
+                "Brake Temperature (°C)": [], "Axle Vibration (mm/s)": [], "Wheel Wear (%)": [],
+                "Engine Load (%)": [], "Battery Voltage (V)": [], "Fuel Efficiency (km/L)": []
+            };
+            let timeSeries = [];
+
+            // Load train data from JSON
+            async function fetchTrainData() {
+                try {
+                    const response = await fetch('./train_max_distance_only.json');
+                    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                    trainData = await response.json();
+                    console.log('Train data loaded:', trainData.length, 'records');
+                    initializeAI();
+                } catch (error) {
+                    console.error('Error loading train data:', error);
+                    console.warn('Note: If using file:// protocol, you need to start a local server. Try: python -m http.server 8000');
+                    alert('Failed to load train data.\n\nTo run this app, use a local server:\n\nWindows:\n  python -m http.server 8000\n\nThen visit: http://localhost:8000/login.html');
+                    trainData = [];
+                }
+            }
+
+            // Dark mode toggle
+            try {
+                const toggleDark = document.getElementById('toggle-dark');
+                if (toggleDark) {
+                    toggleDark.addEventListener('click', () => {
+                        console.log('Dark mode toggled');
+                        document.body.classList.toggle('bg-gray-900');
+                        document.querySelectorAll('.glassmorphism').forEach(el => {
+                            el.classList.toggle('bg-gray-800');
+                            el.classList.toggle('text-white');
+                        });
+                        toggleDark.innerHTML = document.body.classList.contains('bg-gray-900')
+                            ? '<i class="fas fa-sun"></i> Light Mode'
+                            : '<i class="fas fa-moon"></i> Dark Mode';
+                    });
+                }
+            } catch (error) {
+                console.error('Error setting up dark mode:', error);
+            }
+
+            // Sensor data generation
+            function generateSensorData() {
+                return {
+                    "Brake Temperature (°C)": Math.random() * (120 - 30) + 30,
+                    "Axle Vibration (mm/s)": Math.random() * (4.0 - 0.1) + 0.1,
+                    "Wheel Wear (%)": Math.random() * (90 - 10) + 10,
+                    "Engine Load (%)": Math.random() * (100 - 40) + 40,
+                    "Battery Voltage (V)": Math.random() * (14.5 - 10.5) + 10.5,
+                    "Fuel Efficiency (km/L)": Math.random() * (5 - 2) + 2
+                };
+            }
+
+            // THI calculation
+            function calculateTHI(sensorData, scheduleData) {
+                let score = 100;
+                if (sensorData["Brake Temperature (°C)"] > 90) score -= 15;
+                if (sensorData["Axle Vibration (mm/s)"] > 2.5) score -= 20;
+                if (sensorData["Wheel Wear (%)"] > 70) score -= 25;
+                if (sensorData["Engine Load (%)"] > 85) score -= 10;
+                if (sensorData["Battery Voltage (V)"] < 11) score -= 10;
+                if (sensorData["Fuel Efficiency (km/L)"] < 3) score -= 10;
+                const delays = scheduleData.reduce((sum, row) => {
+                    const stopTime = (row['Dep Time'] - row['Arr Time']) * 24 * 60;
+                    return sum + (stopTime > 10 ? stopTime - 10 : 0);
+                }, 0);
+                score -= Math.min(delays / 2, 20);
+                return Math.max(0, Math.round(score));
+            }
+
+            function getMaintenanceSuggestion(thi) {
+                if (thi >= 80) return "✅ Train in excellent condition. Routine checks sufficient.";
+                if (thi >= 50) return "⚠️ Schedule maintenance within 48 hours.";
+                return "❌ Critical issues detected. Immediate inspection required!";
+            }
+
+            function decimalToTime(decimal) {
+                if (decimal == null) return 'N/A';
+                const hours = Math.floor(decimal * 24);
+                const minutes = Math.round((decimal * 24 - hours) * 60);
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            }
+
+            // AI Features
+            const aiFeatures = [
+                // Anomaly Detection (20)
+                { name: 'Negative Stop Time Detection', fn: data => data.some(row => (row['Dep Time'] - row['Arr Time']) < 0) ? "⚠️ Negative stop times detected." : "✅ No negative stop times.", description: 'Identifies invalid stop durations.' },
+                { name: 'Missing Time Detection', fn: data => data.some(row => row['Arr Time'] == null || row['Dep Time'] == null) ? "⚠️ Missing arrival/departure times." : "✅ All times present.", description: 'Checks for null time entries.' },
+                { name: 'Distance Anomaly', fn: data => data.some((row, i) => i > 0 && row.Distance < data[i-1].Distance) ? "⚠️ Decreasing distance detected." : "✅ Distance progression valid.", description: 'Ensures distance increases monotonically.' },
+                { name: 'Station Code Duplication', fn: data => new Set(data.map(row => row['Station Code'])).size !== data.length ? "⚠️ Duplicate station codes." : "✅ Unique station codes.", description: 'Detects repeated station codes.' },
+                { name: 'Sequence Gap Detection', fn: data => data.some((row, i) => i > 0 && row.SEQ !== data[i-1].SEQ + 1) ? "⚠️ Gaps in SEQ numbers." : "✅ Sequential SEQ numbers.", description: 'Checks for missing SEQ values.' },
+                { name: 'Source-Destination Mismatch', fn: data => data[0]['Source Station'] !== data[0]['Station Code'] || data[data.length-1]['Destination Station'] !== data[data.length-1]['Station Code'] ? "⚠️ Source/Destination mismatch." : "✅ Valid source/destination.", description: 'Verifies source and destination stations.' },
+                { name: 'Time Jump Detection', fn: data => data.some((row, i) => i > 0 && (row['Arr Time'] - data[i-1]['Dep Time']) * 24 * 60 > 120) ? "⚠️ Large time jumps between stations." : "✅ Normal time progression.", description: 'Identifies unrealistic travel times.' },
+                { name: 'Sensor Spike Detection', fn: sensor => sensor["Brake Temperature (°C)"] > 110 ? "⚠️ Brake temperature spike." : "✅ Normal brake temperature.", description: 'Detects extreme brake temperature readings.' },
+                { name: 'Vibration Outlier', fn: sensor => sensor["Axle Vibration (mm/s)"] > 3.5 ? "⚠️ High axle vibration." : "✅ Normal vibration levels.", description: 'Identifies excessive axle vibrations.' },
+                { name: 'Wheel Wear Threshold', fn: sensor => sensor["Wheel Wear (%)"] > 85 ? "⚠️ Critical wheel wear." : "✅ Wheel wear within limits.", description: 'Checks for severe wheel degradation.' },
+                { name: 'Engine Overload', fn: sensor => sensor["Engine Load (%)"] > 95 ? "⚠️ Engine overload detected." : "✅ Engine load normal.", description: 'Detects engine strain.' },
+                { name: 'Battery Voltage Drop', fn: sensor => sensor["Battery Voltage (V)"] < 10.8 ? "⚠️ Low battery voltage." : "✅ Battery voltage stable.", description: 'Identifies battery issues.' },
+                { name: 'Fuel Efficiency Dip', fn: sensor => sensor["Fuel Efficiency (km/L)"] < 2.5 ? "⚠️ Poor fuel efficiency." : "✅ Fuel efficiency normal.", description: 'Detects fuel consumption anomalies.' },
+                { name: 'Stop Time Outlier', fn: data => data.some(row => (row['Dep Time'] - row['Arr Time']) * 24 * 60 > 30) ? "⚠️ Excessive stop times." : "✅ Normal stop durations.", description: 'Identifies unusually long stops.' },
+                { name: 'Schedule Inconsistency', fn: data => data.some((row, i) => i > 0 && row['Arr Time'] < data[i-1]['Dep Time']) ? "⚠️ Schedule inconsistencies." : "✅ Consistent schedule.", description: 'Checks for time overlaps.' },
+                { name: 'Station Name Mismatch', fn: data => data.some(row => row['Station Name'] === row['Source Station Name'] && row['Station Code'] !== row['Source Station']) ? "⚠️ Station name/code mismatch." : "✅ Station names consistent.", description: 'Verifies station name consistency.' },
+                { name: 'Zero Distance Check', fn: data => data.some((row, i) => i > 0 && row.Distance === data[i-1].Distance) ? "⚠️ Zero distance between stations." : "✅ Valid distances.", description: 'Detects missing distance increments.' },
+                { name: 'Invalid SEQ', fn: data => data.some(row => row.SEQ <= 0) ? "⚠️ Invalid SEQ numbers." : "✅ Valid SEQ numbers.", description: 'Checks for non-positive SEQ values.' },
+                { name: 'Time Format Anomaly', fn: data => data.some(row => isNaN(row['Arr Time']) || isNaN(row['Dep Time'])) ? "⚠️ Invalid time formats." : "✅ Valid time formats.", description: 'Ensures numeric time values.' },
+                { name: 'Route Loop Detection', fn: data => data.some((row, i) => data.slice(i+1).some(r => r['Station Code'] === row['Station Code'])) ? "⚠️ Route loops detected." : "✅ No route loops.", description: 'Identifies repeated stations.' },
+                // Predictive Analytics - just showing first 5 for brevity
+                { name: 'Delay Prediction', fn: data => { const stops = data.filter(row => row['Arr Time'] != null && row['Dep Time'] != null); const avgStop = stops.length ? stops.reduce((sum, row) => sum + (row['Dep Time'] - row['Arr Time']) * 24 * 60, 0) / stops.length : 0; const delay = avgStop > 5 ? Math.round((avgStop - 5) * data.length) : 0; return delay > 0 ? `Predicted delay: ${delay} minutes` : "No significant delay expected."; }, description: 'Estimates total delay based on stop durations.' },
+                { name: 'Maintenance Urgency', fn: sensor => sensor["Wheel Wear (%)"] > 80 ? "Critical maintenance needed in 24 hours." : "Maintenance not urgent.", description: 'Predicts maintenance urgency.' },
+                { name: 'Route Efficiency Score', fn: data => { const stops = data.length; const distance = data[data.length-1].Distance; return `Route efficiency: ${(distance / stops).toFixed(1)} km/stop`; }, description: 'Measures route efficiency.' },
+                { name: 'Train Reliability Score', fn: sensor => { const score = 100 - (sensor["Wheel Wear (%)"] / 2 + sensor["Engine Load (%)"] / 4); return `Reliability: ${Math.round(score)}%`; }, description: 'Calculates train reliability.' },
+                { name: 'Travel Time Estimate', fn: data => { const totalTime = (data[data.length-1]['Arr Time'] - data[0]['Dep Time']) * 24 * 60; return `Estimated travel time: ${Math.round(totalTime)} minutes`; }, description: 'Calculates total journey time.' }
+            ];
+
+            function initializeAI() {
+                const aiFeaturesList = document.getElementById('ai-features-list');
+                aiFeatures.forEach(feature => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${feature.name}</strong>: ${feature.description}`;
+                    aiFeaturesList.appendChild(li);
+                });
+            }
+
+            // Train schedule and THI
+            const getThiBtn = document.getElementById('get-thi');
+            const trainNumberInput = document.getElementById('train-number');
+            const suggestionsDiv = document.getElementById('suggestions');
+            const trainNotFound = document.getElementById('train-not-found');
+            const trainTableBody = document.getElementById('train-table-body');
+            const sensorTable = document.getElementById('sensor-table');
+            const thiScoreDiv = document.getElementById('thi-score');
+            const thiValue = document.getElementById('thi-value');
+            const thiProgress = document.getElementById('thi-progress');
+            const maintenanceSuggestion = document.getElementById('maintenance-suggestion');
+
+            if (!getThiBtn) {
+                console.error('Get THI button not found');
+                return;
+            }
+            
+            console.log('Setting up event listeners for train data');
+
+            trainNumberInput.addEventListener('input', () => {
+                const query = trainNumberInput.value.trim();
+                if (!query) {
+                    suggestionsDiv.classList.add('hidden');
+                    return;
+                }
+                const uniqueTrains = [...new Set(trainData.map(row => ({ no: row['Train No'], name: row['Train Name'] })))]
+                    .filter(train => train.no?.toString().startsWith(query))
+                    .slice(0, 5);
+                suggestionsDiv.innerHTML = uniqueTrains.map(train => `<div data-train="${train.no}">${train.no} - ${train.name}</div>`).join('');
+                suggestionsDiv.classList.toggle('hidden', !uniqueTrains.length);
+                suggestionsDiv.querySelectorAll('div').forEach(div => {
+                    div.addEventListener('click', () => {
+                        console.log('Train suggestion clicked:', div.dataset.train);
+                        trainNumberInput.value = div.dataset.train;
+                        suggestionsDiv.classList.add('hidden');
+                        getThiBtn.click();
+                    });
+                });
+            });
+
+            getThiBtn.addEventListener('click', () => {
+                console.log('Get THI clicked');
+                const trainNo = trainNumberInput.value.trim();
+                const filteredData = trainData.filter(row => row['Train No']?.toString() === trainNo);
+                trainTableBody.innerHTML = '';
+                trainNotFound.classList.add('hidden');
+                suggestionsDiv.classList.add('hidden');
+
+                if (!filteredData.length) {
+                    trainNotFound.classList.remove('hidden');
+                    sensorTable.innerHTML = '';
+                    thiScoreDiv.innerHTML = '<p class="text-lg font-bold text-gray-300">THI Score: <span id="thi-value">0</span> / 100</p><div class="progress-bar h-6 w-full mt-2"><div id="thi-progress" class="progress-bar-fill" style="width: 0%"></div></div>';
+                    maintenanceSuggestion.innerHTML = '';
+                    if (sensorChart) sensorChart.destroy();
+                    return;
+                }
+
+                // Display schedule
+                filteredData.forEach(row => {
+                    const isSource = row['Station Code'] === row['Source Station'];
+                    const isDest = row['Station Code'] === row['Destination Station'];
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="p-3 border border-gray-600">${row.SEQ ?? 'N/A'}</td>
+                        <td class="p-3 border border-gray-600">${row['Station Name'] ?? 'Unknown'} (${row['Station Code'] ?? 'N/A'}) ${isSource ? '🛤️' : isDest ? '🏁' : ''}</td>
+                        <td class="p-3 border border-gray-600">${decimalToTime(row['Arr Time'])}</td>
+                        <td class="p-3 border border-gray-600">${decimalToTime(row['Dep Time'])}</td>
+                        <td class="p-3 border border-gray-600">${row.Distance ?? 0} km</td>
+                    `;
+                    trainTableBody.appendChild(tr);
+                });
+
+                // Add to favorites
+                const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+                if (!favorites.includes(trainNo)) {
+                    favorites.push(trainNo);
+                    localStorage.setItem('favorites', JSON.stringify(favorites));
+                    updateFavorites();
+                }
+
+                // Display route map with Leaflet/OpenStreetMap
+                displayRouteOnMap(filteredData);
+
+                // Initialize sensor chart
+                if (sensorChart) sensorChart.destroy();
+                sensorChart = new Chart(document.getElementById('sensor-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: timeSeries,
+                        datasets: Object.keys(sensorDataHistory).map(key => ({
+                            label: key,
+                            data: sensorDataHistory[key],
+                            borderColor: ['#3B82F6', '#22C55E', '#F97316', '#A855F7', '#EF4444', '#10B981'][Object.keys(sensorDataHistory).indexOf(key)],
+                            fill: false,
+                            tension: 0.3
+                        }))
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: { title: { display: true, text: 'Time (s)', color: '#D1D5DB' }, ticks: { color: '#D1D5DB' } },
+                            y: { title: { display: true, text: 'Value', color: '#D1D5DB' }, ticks: { color: '#D1D5DB' } }
+                        },
+                        plugins: {
+                            title: { display: true, text: 'Real-Time Sensor Data', color: '#D1D5DB', font: { size: 16 } },
+                            legend: { labels: { color: '#D1D5DB' } }
+                        }
+                    }
+                });
+
+                // Start sensor updates
+                timeSeries = [];
+                Object.values(sensorDataHistory).forEach(arr => arr.length = 0);
+                let t = 0;
+                const updateInterval = setInterval(() => {
+                    const sensorData = generateSensorData();
+                    const thi = calculateTHI(sensorData, filteredData);
+                    timeSeries.push(t++);
+
+                    Object.keys(sensorDataHistory).forEach(key => {
+                        sensorDataHistory[key].push(sensorData[key]);
+                        if (sensorDataHistory[key].length > 20) sensorDataHistory[key].shift();
+                    });
+                    if (timeSeries.length > 20) timeSeries.shift();
+
+                    sensorTable.innerHTML = `
+                        <table class="w-full border-collapse text-sm">
+                            <thead><tr class="bg-blue-800 text-white"><th class="p-3">Parameter</th><th class="p-3">Value</th></tr></thead>
+                            <tbody>${Object.entries(sensorData).map(([k, v]) => `<tr><td class="p-3 border border-gray-600">${k}</td><td class="p-3 border border-gray-600">${v.toFixed(2)}</td></tr>`).join('')}</tbody>
+                        </table>
+                    `;
+
+                    thiValue.textContent = thi;
+                    thiProgress.style.width = `${thi}%`;
+                    maintenanceSuggestion.innerHTML = `<p class="text-lg">${getMaintenanceSuggestion(thi)}</p>`;
+
+                    sensorChart.data.labels = timeSeries;
+                    sensorChart.data.datasets.forEach((dataset, i) => {
+                        dataset.data = sensorDataHistory[Object.keys(sensorDataHistory)[i]];
+                    });
+                    sensorChart.update();
+
+                    if (t > 100) clearInterval(updateInterval);
+                }, 5000);
+            });
+
+            // Favorites
+            function updateFavorites() {
+                const favoritesList = document.getElementById('favorites-list');
+                const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+                favoritesList.innerHTML = '';
+                favorites.forEach(trainNo => {
+                    const train = trainData.find(row => row['Train No']?.toString() === trainNo);
+                    if (train) {
+                        const div = document.createElement('div');
+                        div.className = 'train-card glassmorphism p-4 rounded-lg';
+                        div.innerHTML = `
+                            <p class="font-bold text-blue-300">${trainNo} - ${train['Train Name'] || 'Unknown'}</p>
+                            <p class="text-sm text-gray-400">From: ${train['Source Station Name'] || 'N/A'} (${train['Source Station']})</p>
+                            <p class="text-sm text-gray-400">To: ${train['Destination Station Name'] || 'N/A'} (${train['Destination Station']})</p>
+                        `;
+                        favoritesList.appendChild(div);
+                    }
+                });
+            }
+
+            // Contact form with sentiment analysis
+            try {
+                document.getElementById('contact-submit').addEventListener('click', () => {
+                    console.log('Contact submit clicked');
+                    const message = document.getElementById('contact-message').value;
+                    if (message) {
+                        const sentiment = analyzeSentiment(message);
+                        const feedback = JSON.parse(localStorage.getItem('userFeedback') || '[]');
+                        feedback.push({ message, sentiment, timestamp: new Date().toISOString() });
+                        localStorage.setItem('userFeedback', JSON.stringify(feedback));
+                        document.getElementById('sentiment-analysis').innerHTML = `<i class="fas fa-smile"></i> Sentiment: ${sentiment}`;
+                        alert('Feedback sent! Thank you for your input.');
+                        document.getElementById('contact-message').value = '';
+                    } else {
+                        alert('Please enter a message.');
+                    }
+                });
+            } catch (error) {
+                console.error('Error setting up contact form:', error);
+            }
+
+            // Sentiment analysis
+            function analyzeSentiment(message) {
+                const positiveWords = ['great', 'good', 'awesome', 'excellent', 'happy', 'perfect', 'wonderful', 'amazing'];
+                const negativeWords = ['bad', 'poor', 'terrible', 'awful', 'sad', 'horrible', 'disappointing'];
+                message = message.toLowerCase();
+                const positive = positiveWords.filter(word => message.includes(word)).length;
+                const negative = negativeWords.filter(word => message.includes(word)).length;
+                if (positive > negative) return 'Positive 😊';
+                if (negative > positive) return 'Negative 😞';
+                return 'Neutral 😐';
+            }
+
+            // AI features modal
+            try {
+                const showAiFeatures = document.getElementById('show-ai-features');
+                const aiFeaturesModal = document.getElementById('ai-features-modal');
+                const closeAiModal = document.getElementById('close-ai-modal');
+
+                if (showAiFeatures) {
+                    showAiFeatures.addEventListener('click', () => {
+                        console.log('AI Features clicked');
+                        aiFeaturesModal.style.display = 'flex';
+                    });
+                }
+
+                if (closeAiModal) {
+                    closeAiModal.addEventListener('click', () => {
+                        console.log('Close AI Modal clicked');
+                        aiFeaturesModal.style.display = 'none';
+                    });
+                }
+            } catch (error) {
+                console.error('Error setting up AI features modal:', error);
+            }
+
+            // Export report
+            try {
+                document.getElementById('export-report').addEventListener('click', () => {
+                    console.log('Export report clicked');
+                    const trainNo = trainNumberInput.value.trim();
+                    const filteredData = trainData.filter(row => row['Train No']?.toString() === trainNo);
+                    if (!filteredData.length) {
+                        alert('Please select a train first.');
+                        return;
+                    }
+                    const report = {
+                        trainNo,
+                        trainName: filteredData[0]['Train Name'],
+                        exportDate: new Date().toISOString(),
+                        exportedBy: sessionStorage.getItem('username'),
+                        schedule: filteredData.map(row => ({
+                            station: row['Station Name'],
+                            code: row['Station Code'],
+                            arrival: decimalToTime(row['Arr Time']),
+                            departure: decimalToTime(row['Dep Time']),
+                            distance: row.Distance
+                        })),
+                        thi: document.getElementById('thi-value').textContent,
+                        maintenance: maintenanceSuggestion.textContent
+                    };
+                    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `train_${trainNo}_report_${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            } catch (error) {
+                console.error('Error setting up export report:', error);
+            }
+
+            // Initialize
+            console.log('Fetching train data...');
+            fetchTrainData().then(() => {
+                console.log('Train data loaded, updating favorites');
+                updateFavorites();
+                console.log('Application initialization complete!');
+            });
+        }
+    </script>
+</body>
+</html>
