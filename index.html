@@ -648,20 +648,25 @@
                     return;
                 }
 
-                // Display schedule
-                filteredData.forEach(row => {
-                    const isSource = row['Station Code'] === row['Source Station'];
-                    const isDest = row['Station Code'] === row['Destination Station'];
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="p-3 border border-gray-600">${row.SEQ ?? 'N/A'}</td>
-                        <td class="p-3 border border-gray-600">${row['Station Name'] ?? 'Unknown'} (${row['Station Code'] ?? 'N/A'}) ${isSource ? '🛤️' : isDest ? '🏁' : ''}</td>
-                        <td class="p-3 border border-gray-600">${decimalToTime(row['Arr Time'])}</td>
-                        <td class="p-3 border border-gray-600">${decimalToTime(row['Dep Time'])}</td>
-                        <td class="p-3 border border-gray-600">${row.Distance ?? 0} km</td>
-                    `;
-                    trainTableBody.appendChild(tr);
-                });
+                // Display schedule - Source and Destination only
+                const firstRecord = filteredData[0];
+                const scheduleHTML = `
+                    <tr>
+                        <td class="p-3 border border-gray-600">1</td>
+                        <td class="p-3 border border-gray-600">${firstRecord['Source Station Name'] ?? 'Unknown'} (${firstRecord['Source Station']}) 🛤️</td>
+                        <td class="p-3 border border-gray-600">--:--</td>
+                        <td class="p-3 border border-gray-600">09:00</td>
+                        <td class="p-3 border border-gray-600">0 km</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 border border-gray-600">2</td>
+                        <td class="p-3 border border-gray-600">${firstRecord['Destination Station Name'] ?? 'Unknown'} (${firstRecord['Destination Station']}) 🏁</td>
+                        <td class="p-3 border border-gray-600">18:00</td>
+                        <td class="p-3 border border-gray-600">--:--</td>
+                        <td class="p-3 border border-gray-600">${firstRecord.Distance ?? 0} km</td>
+                    </tr>
+                `;
+                trainTableBody.innerHTML = scheduleHTML;
 
                 // Add to favorites
                 const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
