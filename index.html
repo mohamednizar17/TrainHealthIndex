@@ -650,20 +650,31 @@
 
                 // Display schedule - Source and Destination only
                 const firstRecord = filteredData[0];
+                console.log('First record for schedule:', firstRecord);
+                
+                // Get source and destination with multiple fallback options
+                const sourceName = firstRecord['Source Station Name'] || firstRecord['source_station_name'] || 'Unknown Source';
+                const destName = firstRecord['Destination Station Name'] || firstRecord['destination_station_name'] || 'Unknown Destination';
+                const sourceCode = firstRecord['Source Station'] || firstRecord['source_station'] || 'N/A';
+                const destCode = firstRecord['Destination Station'] || firstRecord['destination_station'] || 'N/A';
+                const distance = firstRecord['Distance'] || firstRecord['distance'] || 0;
+                
+                console.log('Schedule display:', { sourceName, destName, sourceCode, destCode, distance });
+                
                 const scheduleHTML = `
                     <tr>
                         <td class="p-3 border border-gray-600">1</td>
-                        <td class="p-3 border border-gray-600">${firstRecord['Source Station Name'] ?? 'Unknown'} (${firstRecord['Source Station']}) 🛤️</td>
+                        <td class="p-3 border border-gray-600">${sourceName} (${sourceCode}) 🛤️</td>
                         <td class="p-3 border border-gray-600">--:--</td>
                         <td class="p-3 border border-gray-600">09:00</td>
                         <td class="p-3 border border-gray-600">0 km</td>
                     </tr>
                     <tr>
                         <td class="p-3 border border-gray-600">2</td>
-                        <td class="p-3 border border-gray-600">${firstRecord['Destination Station Name'] ?? 'Unknown'} (${firstRecord['Destination Station']}) 🏁</td>
+                        <td class="p-3 border border-gray-600">${destName} (${destCode}) 🏁</td>
                         <td class="p-3 border border-gray-600">18:00</td>
                         <td class="p-3 border border-gray-600">--:--</td>
-                        <td class="p-3 border border-gray-600">${firstRecord.Distance ?? 0} km</td>
+                        <td class="p-3 border border-gray-600">${distance} km</td>
                     </tr>
                 `;
                 trainTableBody.innerHTML = scheduleHTML;
