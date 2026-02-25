@@ -333,7 +333,20 @@
             'HWH': { lat: 22.5726, lng: 88.3639, name: 'HOWRAH', fullName: 'Howrah Junction' },
             'BJKH': { lat: 22.2670, lng: 88.3519, name: 'BANKURA', fullName: 'Bankura Station' },
             'CTM': { lat: 23.1815, lng: 79.9864, name: 'CHHINDWARA', fullName: 'Chhindwara Station' },
-            'ITJ': { lat: 24.7745, lng: 75.8577, name: 'INDORE JN.', fullName: 'Indore Junction' }
+            'ITJ': { lat: 24.7745, lng: 75.8577, name: 'INDORE JN.', fullName: 'Indore Junction' },
+            // Additional major Indian Railway Stations
+            'DR': { lat: 19.0233, lng: 72.8352, name: 'DADAR', fullName: 'Dadar Station' },
+            'SNSI': { lat: 19.2183, lng: 74.4867, name: 'SAI NAGAR SHIRDI', fullName: 'Sai Nagar Shirdi' },
+            'PVR': { lat: 17.6728, lng: 75.3413, name: 'PANDHARPUR', fullName: 'Pandharpur Station' },
+            'SWV': { lat: 15.8019, lng: 73.2635, name: 'SAWANTWADI ROAD', fullName: 'Sawantwadi Road Station' },
+            'PDY': { lat: 12.0096, lng: 79.8544, name: 'PONDICHERRY', fullName: 'Pondicherry Junction' },
+            'TVC': { lat: 8.4885, lng: 76.9754, name: 'THIRUVANANTHAPURAM', fullName: 'Thiruvananthapuram Central' },
+            'CSTM': { lat: 18.9676, lng: 72.8194, name: 'BOMBAY CST', fullName: 'Bombay Central' },
+            'KYQ': { lat: 26.9124, lng: 75.8262, name: 'JAIPUR', fullName: 'Jaipur Junction' },
+            'GOA': { lat: 15.2941, lng: 73.8150, name: 'GOA JUNCTION', fullName: 'Goa Junction' },
+            'LTT': { lat: 19.0169, lng: 72.9904, name: 'LOKMANYA TILAK', fullName: 'Lokmanya Tilak Terminal' },
+            'PUNE': { lat: 18.5244, lng: 73.8487, name: 'PUNE JN', fullName: 'Pune Junction' },
+            'NZM': { lat: 28.6356, lng: 77.2273, name: 'NIZAMUDDIN', fullName: 'Nizamuddin Station' }
         };
 
         // === LEAFLET MAP INITIALIZATION ===
@@ -394,7 +407,27 @@
             console.log('Dest coords:', destCoords);
 
             if (!sourceCoords || !destCoords) {
-                console.warn('Station coordinates not found. Available stations:', Object.keys(RAILWAY_STATIONS));
+                console.warn(`Station coordinates not found for ${sourceCode} or ${destCode}`);
+                console.warn('Available stations:', Object.keys(RAILWAY_STATIONS));
+                
+                // Show message in directions panel instead of failing
+                const panel = document.getElementById('directions-panel');
+                const directionText = document.getElementById('directions-text');
+                if (panel) panel.classList.remove('hidden');
+                
+                if (directionText) {
+                    directionText.innerHTML = `
+                        <div style="padding: 1rem; background: #FEF3C7; border: 1px solid #FBBF24; border-radius: 0.5rem; color: #92400E;">
+                            <strong>⚠️ Map Not Available</strong><br/>
+                            Route: <strong>${sourceName}</strong> → <strong>${destName}</strong><br/>
+                            Distance: <strong>${document.querySelector('[data-distance]')?.textContent || 'N/A'}</strong><br/>
+                            <small>Coordinates available only for major stations: ${Object.keys(RAILWAY_STATIONS).join(', ')}</small>
+                        </div>
+                    `;
+                }
+                
+                // Center map on India
+                googleMap.setView([20.5937, 78.9629], 5);
                 return;
             }
 
